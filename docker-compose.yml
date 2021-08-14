@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  dev:
+    image: sehandev/softsplat
+    ports:
+      - "8080:8888"
+    volumes:
+      - ./softcode:/workspace
+    environment:
+      - TZ=Asis/Seoul
+      - DEBIAN_FRONTEND=noninteractive
+      - JUPYTER_ENABLE_LAB=yes
+    shm_size: "8gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    stdin_open: true
+  
