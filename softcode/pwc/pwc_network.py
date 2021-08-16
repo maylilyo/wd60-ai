@@ -1,37 +1,21 @@
-#!/usr/bin/env python
-
-import torch
-
-import getopt
-import math
-import numpy
 import os
-import PIL
-import PIL.Image
 import sys
-import torch.nn.functional as F
-from pwc.utils.constv import ConstV
+import math
+import getopt
+
+import numpy
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from pwc.utils.constv import ConstV
 from .correlation import correlation
-
-# try:
-#     from .correlation import correlation  # the custom cost volume layer
-# except:
-#     sys.path.insert(0, './correlation')
-#     import correlation  # you should consider upgrading python
-# end
-
-##########################################################
-
-# requires at least pytorch version 1.3.0
-assert(int(str('').join(torch.__version__.split('.')[0:2])) >= 13)
 
 # torch.set_grad_enabled(False) # make sure to not compute gradients for computational performance
 
 # make sure to use cudnn for computational performance
 torch.backends.cudnn.enabled = True
 
-##########################################################
 
 arguments_strModel = 'default'
 arguments_strFirst = './images/first.png'
@@ -47,272 +31,346 @@ for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [strParameter[2:] 
         arguments_strSecond = strArgument  # path to the second frame
     if strOption == '--out' and strArgument != '':
         arguments_strOut = strArgument  # path to where the output should be stored
-# end
-
-##########################################################
-
-backwarp_tenGrid = {}
-backwarp_tenPartial = {}
 
 
-def backwarp(tenInput, tenFlow):
-    if str(tenFlow.shape) not in backwarp_tenGrid:
-        tenHor = torch.linspace(-1.0 + (1.0 / tenFlow.shape[3]), 1.0 - (
-            1.0 / tenFlow.shape[3]), tenFlow.shape[3]).view(1, 1, 1, -1).expand(-1, -1, tenFlow.shape[2], -1)
-        tenVer = torch.linspace(-1.0 + (1.0 / tenFlow.shape[2]), 1.0 - (
-            1.0 / tenFlow.shape[2]), tenFlow.shape[2]).view(1, 1, -1, 1).expand(-1, -1, -1, tenFlow.shape[3])
-
-        backwarp_tenGrid[str(tenFlow.shape)] = torch.cat(
-            [tenHor, tenVer], 1).cuda()
-    # end
-
-    if str(tenFlow.shape) not in backwarp_tenPartial:
-        backwarp_tenPartial[str(tenFlow.shape)] = tenFlow.new_ones(
-            [tenFlow.shape[0], 1, tenFlow.shape[2], tenFlow.shape[3]])
-    # end
-
-    tenFlow = torch.cat([tenFlow[:, 0:1, :, :] / ((tenInput.shape[3] - 1.0) / 2.0),
-                        tenFlow[:, 1:2, :, :] / ((tenInput.shape[2] - 1.0) / 2.0)], 1)
-    tenInput = torch.cat(
-        [tenInput, backwarp_tenPartial[str(tenFlow.shape)]], 1)
-
-    tenOutput = torch.nn.functional.grid_sample(input=tenInput, grid=(backwarp_tenGrid[str(
-        tenFlow.shape)] + tenFlow).permute(0, 2, 3, 1), mode='bilinear', padding_mode='zeros', align_corners=False)
-
-    tenMask = tenOutput[:, -1:, :, :]
-    tenMask[tenMask > 0.999] = 1.0
-    tenMask[tenMask < 1.0] = 0.0
-
-    return tenOutput[:, :-1, :, :] * tenMask
-# end
-
-##########################################################
-
-
-class Network(torch.nn.Module):
+class Extractor(nn.Module):
     def __init__(self):
-        super(Network, self).__init__()
-        #
+        super().__init__()
 
-        class Extractor(torch.nn.Module):
-            def __init__(self):
-                super(Extractor, self).__init__()
+        self.netOne = self.get_new_CNN(3, 16)
+        self.netTwo = self.get_new_CNN(16, 32)
+        self.netThr = self.get_new_CNN(32, 64)
+        self.netFou = self.get_new_CNN(64, 96)
+        self.netFiv = self.get_new_CNN(96, 128)
+        self.netSix = self.get_new_CNN(128, 196)
 
-                self.netOne = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=3, out_channels=16,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=16, out_channels=16,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=16, out_channels=16,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+    def get_new_CNN(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            )
+        )
 
-                self.netTwo = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=16, out_channels=32,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=32, out_channels=32,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=32, out_channels=32,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+    def forward(self, input_tensor):
+        tenOne = self.netOne(input_tensor)
+        tenTwo = self.netTwo(tenOne)
+        tenThr = self.netThr(tenTwo)
+        tenFou = self.netFou(tenThr)
+        tenFiv = self.netFiv(tenFou)
+        tenSix = self.netSix(tenFiv)
 
-                self.netThr = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=32, out_channels=64,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=64, out_channels=64,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=64, out_channels=64,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+        return [tenOne, tenTwo, tenThr, tenFou, tenFiv, tenSix]
 
-                self.netFou = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=64, out_channels=96,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=96, out_channels=96,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=96, out_channels=96,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
 
-                self.netFiv = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=96, out_channels=128,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=128, out_channels=128,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=128, out_channels=128,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+class Decoder(nn.Module):
+    tmp_list = [None, None, 81 + 32 + 2 + 2, 81 + 64 + 2 + 2, 81 + 96 + 2 + 2, 81 + 128 + 2 + 2, 81, None]
 
-                self.netSix = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=128, out_channels=196,
-                                    kernel_size=3, stride=2, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=196, out_channels=196,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=196, out_channels=196,
-                                    kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
-            # end
+    grid_cache = {}
+    partial_cache = {}
 
-            def forward(self, tenInput):
-                tenOne = self.netOne(tenInput)
-                tenTwo = self.netTwo(tenOne)
-                tenThr = self.netThr(tenTwo)
-                tenFou = self.netFou(tenThr)
-                tenFiv = self.netFiv(tenFou)
-                tenSix = self.netSix(tenFiv)
+    def __init__(self, intLevel):
+        super().__init__()
 
-                return [tenOne, tenTwo, tenThr, tenFou, tenFiv, tenSix]
-            # end
-        # end
+        intPrevious = self.tmp_list[intLevel + 1]
+        intCurrent = self.tmp_list[intLevel]
 
-        class Decoder(torch.nn.Module):
-            def __init__(self, intLevel):
-                super(Decoder, self).__init__()
-                self.intLevel = intLevel
-                intPrevious = [None, None, 81 + 32 + 2 + 2, 81 + 64 + 2 + 2,
-                               81 + 96 + 2 + 2, 81 + 128 + 2 + 2, 81, None][intLevel + 1]
-                intCurrent = [None, None, 81 + 32 + 2 + 2, 81 + 64 + 2 + 2,
-                              81 + 96 + 2 + 2, 81 + 128 + 2 + 2, 81, None][intLevel + 0]
+        if intLevel < 6:
+            self.netUpflow = nn.ConvTranspose2d(
+                in_channels=2,
+                out_channels=2,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+            )
+        if intLevel < 6:
+            self.netUpfeat = nn.ConvTranspose2d(
+                in_channels=intPrevious + 128 + 128 + 96 + 64 + 32,
+                out_channels=2,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+            )
+        if intLevel < 6:
+            self.fltBackwarp = [None, None, None, 5.0, 2.5, 1.25, 0.625, None][intLevel + 1]
 
-                if intLevel < 6:
-                    self.netUpflow = torch.nn.ConvTranspose2d(
-                        in_channels=2, out_channels=2, kernel_size=4, stride=2, padding=1)
-                if intLevel < 6:
-                    self.netUpfeat = torch.nn.ConvTranspose2d(
-                        in_channels=intPrevious + 128 + 128 + 96 + 64 + 32, out_channels=2, kernel_size=4, stride=2, padding=1)
-                if intLevel < 6:
-                    self.fltBackwarp = [None, None, None, 5.0,
-                                        2.5, 1.25, 0.625, None][intLevel + 1]
+        self.netOne = self.get_new_CNN(intCurrent, 128)
+        self.netTwo = self.get_new_CNN(intCurrent + 128, 128)
+        self.netThr = self.get_new_CNN(intCurrent + 128 + 128, 96)
+        self.netFou = self.get_new_CNN(intCurrent + 128 + 128 + 96, 64)
+        self.netFiv = self.get_new_CNN(intCurrent + 128 + 128 + 96 + 64, 32)
+        self.netSix = nn.Sequential(
+            nn.Conv2d(
+                in_channels=intCurrent + 128 + 128 + 96 + 64 + 32,
+                out_channels=2,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            )
+        )
 
-                self.netOne = torch.nn.Sequential(
-                    torch.nn.Conv2d(
-                        in_channels=intCurrent, out_channels=128, kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+    def get_new_CNN(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            )
+        )
 
-                self.netTwo = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=intCurrent + 128,
-                                    out_channels=128, kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+    def backwarp(self, input_tensor, flow_tensor):
+        key = str(flow_tensor.shape)
 
-                self.netThr = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=intCurrent + 128 + 128,
-                                    out_channels=96, kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+        if key in Decoder.grid_cache:
+            backwarped_tensor = Decoder.grid_cache[key]
+        else:
+            horizontal_tensor = torch.linspace(
+                start=-1.0 + (1.0 / flow_tensor.shape[3]),
+                end=1.0 - (1.0 / flow_tensor.shape[3]),
+                steps=flow_tensor.shape[3],
+            )
+            horizontal_tensor = horizontal_tensor.view(1, 1, 1, -1)
+            horizontal_tensor = horizontal_tensor.expand(-1, -1, flow_tensor.shape[2], -1)
 
-                self.netFou = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=intCurrent + 128 + 128 + 96,
-                                    out_channels=64, kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+            vertical_tensor = torch.linspace(
+                start=-1.0 + (1.0 / flow_tensor.shape[2]),
+                end=1.0 - (1.0 / flow_tensor.shape[2]),
+                steps=flow_tensor.shape[2],
+            )
+            vertical_tensor = vertical_tensor.view(1, 1, -1, 1)
+            vertical_tensor = vertical_tensor.expand(-1, -1, -1, flow_tensor.shape[3])
 
-                self.netFiv = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=intCurrent + 128 + 128 + 96 +
-                                    64, out_channels=32, kernel_size=3, stride=1, padding=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1)
-                )
+            backwarped_tensor = torch.cat(
+                tensors=[horizontal_tensor, vertical_tensor],
+                dim=1,
+            )
+            backwarped_tensor = backwarped_tensor.cuda()
 
-                self.netSix = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=intCurrent + 128 + 128 + 96 +
-                                    64 + 32, out_channels=2, kernel_size=3, stride=1, padding=1)
-                )
-            # end
+            # Save grid to cache
+            Decoder.grid_cache[key] = backwarped_tensor
 
-            def forward(self, tenFirst, tenSecond, objPrevious):
-                tenFlow = None
-                tenFeat = None
+        if key in Decoder.partial_cache:
+            partial_tensor = Decoder.partial_cache[key]
+        else:
+            partial_tensor = flow_tensor.new_ones([flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
 
-                if objPrevious is None:
-                    tenFlow = None
-                    tenFeat = None
+            # Save partial to cache
+            Decoder.partial_cache[key] = partial_tensor
 
-                    tenVolume = torch.nn.functional.leaky_relu(input=correlation.FunctionCorrelation(
-                        tenFirst=tenFirst, tenSecond=tenSecond), negative_slope=0.1, inplace=False)
+        flow_tensor = torch.cat(
+            tensors=[
+                flow_tensor[:, 0:1, :, :] / ((input_tensor.shape[3] - 1.0) / 2.0),
+                flow_tensor[:, 1:2, :, :] / ((input_tensor.shape[2] - 1.0) / 2.0)
+            ],
+            dim=1,
+        )
 
-                    tenFeat = torch.cat([tenVolume], 1)
+        input_tensor = torch.cat([input_tensor, partial_tensor], 1)
 
-                elif objPrevious is not None:
-                    tenFlow = self.netUpflow(objPrevious['tenFlow'])
-                    tenFeat = self.netUpfeat(objPrevious['tenFeat'])
+        grid = backwarped_tensor + flow_tensor
+        grid = grid.permute(0, 2, 3, 1)
 
-                    tenVolume = torch.nn.functional.leaky_relu(input=correlation.FunctionCorrelation(tenFirst=tenFirst, tenSecond=backwarp(
-                        tenInput=tenSecond, tenFlow=tenFlow * self.fltBackwarp)), negative_slope=0.1, inplace=False)
-                    # corr 对应  tenVolume tenFirst对应x1  flow 对应tenflow
-                    tenFeat = torch.cat(
-                        [tenVolume, tenFirst, tenFlow, tenFeat], 1)
+        output_tensor = F.grid_sample(
+            input=input_tensor,
+            grid=grid,
+            mode='bilinear',
+            padding_mode='zeros',
+            align_corners=False,
+        )
 
-                # end
-                # #如果是最后一层
-                # if self.intLevel==6:
+        mask_tensor = output_tensor[:, -1:, :, :]
+        mask_tensor[mask_tensor > 0.999] = 1.0
+        mask_tensor[mask_tensor < 1.0] = 0.0
 
-                tenFeat = torch.cat([self.netOne(tenFeat), tenFeat], 1)
-                tenFeat = torch.cat([self.netTwo(tenFeat), tenFeat], 1)
-                tenFeat = torch.cat([self.netThr(tenFeat), tenFeat], 1)
-                tenFeat = torch.cat([self.netFou(tenFeat), tenFeat], 1)
-                tenFeat = torch.cat([self.netFiv(tenFeat), tenFeat], 1)
+        return output_tensor[:, :-1, :, :] * mask_tensor
 
-                tenFlow = self.netSix(tenFeat)
+    def forward(self, first_tensor, second_tensor, prev_object):
+        flow_tensor = None
+        feature_tensor = None
 
-                return {
-                    'tenFlow': tenFlow,
-                    'tenFeat': tenFeat
-                }
-            # end
-        # end
+        if prev_object is None:
+            flow_tensor = None
+            feature_tensor = None
 
-        class Refiner(torch.nn.Module):
-            def __init__(self, in_ch):
-                super(Refiner, self).__init__()
+            _input = correlation.FunctionCorrelation(
+                first_tensor=first_tensor,
+                second_tensor=second_tensor,
+            )
+            tenVolume = F.leaky_relu(
+                input=_input,
+                negative_slope=0.1,
+                inplace=False,
+            )
 
-                self.netMain = torch.nn.Sequential(
-                    torch.nn.Conv2d(in_channels=in_ch, out_channels=128,
-                                    kernel_size=3, stride=1, padding=1, dilation=1),
-                    # nn.BatchNorm2d(128),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=128, out_channels=128,
-                                    kernel_size=3, stride=1, padding=2, dilation=2),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=128, out_channels=128,
-                                    kernel_size=3, stride=1, padding=4, dilation=4),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=128, out_channels=96,
-                                    kernel_size=3, stride=1, padding=8, dilation=8),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=96, out_channels=64,
-                                    kernel_size=3, stride=1, padding=16, dilation=16),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(in_channels=64, out_channels=32,
-                                    kernel_size=3, stride=1, padding=1, dilation=1),
-                    torch.nn.LeakyReLU(inplace=False, negative_slope=0.1),
-                    torch.nn.Conv2d(
-                        in_channels=32, out_channels=2, kernel_size=3, stride=1, padding=1, dilation=1)
-                )
-            # end
+            feature_tensor = torch.cat(
+                tensors=[tenVolume],
+                dim=1,
+            )
+        else:
+            flow_tensor = self.netUpflow(prev_object['flow_tensor'])
+            feature_tensor = self.netUpfeat(prev_object['feature_tensor'])
 
-            def forward(self, tenInput):
-                return self.netMain(tenInput)
-            # end
-        # end
+            second_tensor = self.backwarp(
+                input_tensor=second_tensor,
+                flow_tensor=flow_tensor * self.fltBackwarp,
+            )
+            _input = correlation.FunctionCorrelation(
+                first_tensor=first_tensor,
+                second_tensor=second_tensor,
+            )
+            tenVolume = F.leaky_relu(
+                input=_input,
+                negative_slope=0.1,
+                inplace=False,
+            )
+            # corr 对应  tenVolume first_tensor对应x1  flow 对应tenflow
+            feature_tensor = torch.cat(
+                tensors=[tenVolume, first_tensor, flow_tensor, feature_tensor],
+                dim=1,
+            )
+
+        feature_tensor = torch.cat([self.netOne(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat([self.netTwo(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat([self.netThr(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat([self.netFou(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat([self.netFiv(feature_tensor), feature_tensor], 1)
+
+        flow_tensor = self.netSix(feature_tensor)
+
+        return {
+            'flow_tensor': flow_tensor,
+            'feature_tensor': feature_tensor
+        }
+
+
+class Refiner(nn.Module):
+    def __init__(self, in_ch):
+        super().__init__()
+
+        self.refiner = nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_ch,
+                out_channels=128,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                dilation=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=3,
+                stride=1,
+                padding=2,
+                dilation=2),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=3,
+                stride=1,
+                padding=4,
+                dilation=4,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=96,
+                kernel_size=3,
+                stride=1,
+                padding=8,
+                dilation=8,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+                padding=16,
+                dilation=16,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                dilation=1,
+            ),
+            nn.LeakyReLU(
+                inplace=False,
+                negative_slope=0.1,
+            ),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=2,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                dilation=1,
+            )
+        )
+
+    def forward(self, input_tensor):
+        return self.refiner(input_tensor)
+
+
+class Network(nn.Module):
+    def __init__(self):
+        super().__init__()
 
         # 初始化 context refiner
         # self.context_refiners = []
@@ -320,6 +378,7 @@ class Network(torch.nn.Module):
         # 	layer = Refiner(ch).to(ConstV.my_device)
         # 	# self.add_module(f'ContextNetwork(Lv{l})', layer)
         # 	self.context_refiners.append(layer)
+
         self.netExtractor = Extractor()
 
         self.netTwo = Decoder(2)
@@ -328,7 +387,8 @@ class Network(torch.nn.Module):
         self.netFiv = Decoder(5)
         self.netSix = Decoder(6)
 
-        self.netRefiner = Refiner(565)
+        # self.netRefiner = Refiner(565)
+        self.refiner = Refiner(565)
 
         # 一定用高斯初始化
         for m in self.modules():
@@ -344,47 +404,37 @@ class Network(torch.nn.Module):
         # print('http://content.sniklaus.com/github/pytorch-pwc/network-' + arguments_strModel + '.pytorch')
         # 不清楚为啥 不能load 似乎只会起反作用，应该是估计的光流没有起到很好的效果？？？
         # 看来输入的光流必须除以255否则不顶用 这根预训练模型绝对有关系
-        #self.load_state_dict({ strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in torch.load('pwc/weights/network-default.pytorch').items()})
 
-        t = torch.load('pwc/weights/network-default.pytorch')
-        t = t.items()
+        self.load_state_dict(torch.load('weights/pwc.pt'))
 
-        tmp = {}
-        for strKey, tenWeight in t:
-            tmp[strKey.replace('module', 'net')] = tenWeight
-
-        self.load_state_dict(tmp)
-    # end
-
-    def forward(self, tenFirst, tenSecond):
-        tenFirst = self.netExtractor(tenFirst)
-        tenSecond = self.netExtractor(tenSecond)
+    def forward(self, first_tensor, second_tensor):
+        first_tensor = self.netExtractor(first_tensor)
+        second_tensor = self.netExtractor(second_tensor)
         if ConstV.mutil_l:
-            objEstimate = self.netSix(tenFirst[-1], tenSecond[-1], None)
+            objEstimate = self.netSix(first_tensor[-1], second_tensor[-1], None)
             # objEstimate['tneFlow'] = [2,2,6,7]
 
-            flow_l1 = objEstimate['tenFlow']
+            flow_l1 = objEstimate['flow_tensor']
 
-            objEstimate = self.netFiv(tenFirst[-2], tenSecond[-2], objEstimate)
+            objEstimate = self.netFiv(first_tensor[-2], second_tensor[-2], objEstimate)
             # objEstimate['tneFlow'] = [2,2,12,14] [2,529,6,7]
 
-            flow_l2 = objEstimate['tenFlow']
-            # flow_l2 = objEstimate['tenFlow'] + self.context_refiners[1](objEstimate['tenFeat'])
-            objEstimate = self.netFou(tenFirst[-3], tenSecond[-3], objEstimate)
+            flow_l2 = objEstimate['flow_tensor']
+            # flow_l2 = objEstimate['flow_tensor'] + self.context_refiners[1](objEstimate['feature_tensor'])
+            objEstimate = self.netFou(first_tensor[-3], second_tensor[-3], objEstimate)
 
             # objEstimate['tneFlow'] = [2,2,24,28] [2, 661, 12, 14]
-            flow_l3 = objEstimate['tenFlow']
-            # flow_l3 = objEstimate['tenFlow'] + self.context_refiners[2](objEstimate['tenFeat'])
-            objEstimate = self.netThr(tenFirst[-4], tenSecond[-4], objEstimate)
+            flow_l3 = objEstimate['flow_tensor']
+            # flow_l3 = objEstimate['flow_tensor'] + self.context_refiners[2](objEstimate['feature_tensor'])
+            objEstimate = self.netThr(first_tensor[-4], second_tensor[-4], objEstimate)
 
             # objEstimate['tneFlow'] = [2,2,48,56]
-            flow_l4 = objEstimate['tenFlow']
-            # flow_l4 = objEstimate['tenFlow'] + self.context_refiners[3](objEstimate['tenFeat'])
-            objEstimate = self.netTwo(tenFirst[-5], tenSecond[-5], objEstimate)
-        # shapels.append(objEstimate['tenFeat'].shape[1])
+            flow_l4 = objEstimate['flow_tensor']
+            # flow_l4 = objEstimate['flow_tensor'] + self.context_refiners[3](objEstimate['feature_tensor'])
+            objEstimate = self.netTwo(first_tensor[-5], second_tensor[-5], objEstimate)
+        # shapels.append(objEstimate['feature_tensor'].shape[1])
         # print(shapels)
-            flow_l5 = objEstimate['tenFlow'] + \
-                self.netRefiner(objEstimate['tenFeat'])
+            flow_l5 = objEstimate['flow_tensor'] + self.refiner(objEstimate['feature_tensor'])
         # objEstimate['tneFlow'] = [2,2,96,112]
         # 貌似是把最后一层的尺寸强行拉到 原始输入尺寸 即扩大四倍 然后数值也乘4
         # if l == args.output_level:
@@ -403,75 +453,74 @@ class Network(torch.nn.Module):
                 return flow_l5
         else:
             # shapels = []
-            objEstimate = self.netSix(tenFirst[-1], tenSecond[-1], None)
+            objEstimate = self.netSix(first_tensor[-1], second_tensor[-1], None)
             # objEstimate['tneFlow'] = [2,2,6,7]
 
-            objEstimate = self.netFiv(tenFirst[-2], tenSecond[-2], objEstimate)
+            objEstimate = self.netFiv(first_tensor[-2], second_tensor[-2], objEstimate)
             # objEstimate['tneFlow'] = [2,2,12,14] [2,529,6,7]
 
-            objEstimate = self.netFou(tenFirst[-3], tenSecond[-3], objEstimate)
-            # shapels.append(objEstimate['tenFeat'].shape[1])
+            objEstimate = self.netFou(first_tensor[-3], second_tensor[-3], objEstimate)
+            # shapels.append(objEstimate['feature_tensor'].shape[1])
 
-            objEstimate = self.netThr(tenFirst[-4], tenSecond[-4], objEstimate)
+            objEstimate = self.netThr(first_tensor[-4], second_tensor[-4], objEstimate)
 
-            # flow_l4 = objEstimate['tenFlow'] + self.context_refiners[3](objEstimate['tenFeat'])
-            objEstimate = self.netTwo(tenFirst[-5], tenSecond[-5], objEstimate)
+            # flow_l4 = objEstimate['flow_tensor'] + self.context_refiners[3](objEstimate['feature_tensor'])
+            objEstimate = self.netTwo(first_tensor[-5], second_tensor[-5], objEstimate)
 
             # flow_coarse + flow_fine
-            return objEstimate['tenFlow'] + self.netRefiner(objEstimate['tenFeat'])
-    # end
-# end
+            return objEstimate['flow_tensor'] + self.refiner(objEstimate['feature_tensor'])
+
 
 # netNetwork = None
 #
-# ##########################################################
 #
-# def estimate(tenFirst, tenSecond):
+#
+# def estimate(first_tensor, second_tensor):
 # 	global netNetwork
 #
 # 	if netNetwork is None:
 # 		netNetwork = Network().cuda().eval()
-# 	# end
 #
-# 	assert(tenFirst.shape[1] == tenSecond.shape[1])
-# 	assert(tenFirst.shape[2] == tenSecond.shape[2])
 #
-# 	intWidth = tenFirst.shape[2]
-# 	intHeight = tenFirst.shape[1]
+# 	assert(first_tensor.shape[1] == second_tensor.shape[1])
+# 	assert(first_tensor.shape[2] == second_tensor.shape[2])
+#
+# 	intWidth = first_tensor.shape[2]
+# 	intHeight = first_tensor.shape[1]
 #
 # 	assert(intWidth == 1024) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
 # 	assert(intHeight == 436) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
 #
-# 	tenPreprocessedFirst = tenFirst.cuda().view(1, 3, intHeight, intWidth)
-# 	tenPreprocessedSecond = tenSecond.cuda().view(1, 3, intHeight, intWidth)
+# 	tenPreprocessedFirst = first_tensor.cuda().view(1, 3, intHeight, intWidth)
+# 	tenPreprocessedSecond = second_tensor.cuda().view(1, 3, intHeight, intWidth)
 #
 # 	intPreprocessedWidth = int(math.floor(math.ceil(intWidth / 64.0) * 64.0))
 # 	intPreprocessedHeight = int(math.floor(math.ceil(intHeight / 64.0) * 64.0))
 #
-# 	tenPreprocessedFirst = torch.nn.functional.interpolate(input=tenPreprocessedFirst, size=(intPreprocessedHeight, intPreprocessedWidth), mode='bilinear', align_corners=False)
-# 	tenPreprocessedSecond = torch.nn.functional.interpolate(input=tenPreprocessedSecond, size=(intPreprocessedHeight, intPreprocessedWidth), mode='bilinear', align_corners=False)
+# 	tenPreprocessedFirst = F.interpolate(input=tenPreprocessedFirst, size=(intPreprocessedHeight, intPreprocessedWidth), mode='bilinear', align_corners=False)
+# 	tenPreprocessedSecond = F.interpolate(input=tenPreprocessedSecond, size=(intPreprocessedHeight, intPreprocessedWidth), mode='bilinear', align_corners=False)
 #
-# 	tenFlow = 20.0 * torch.nn.functional.interpolate(input=netNetwork(tenPreprocessedFirst, tenPreprocessedSecond), size=(intHeight, intWidth), mode='bilinear', align_corners=False)
+# 	flow_tensor = 20.0 * F.interpolate(input=netNetwork(tenPreprocessedFirst, tenPreprocessedSecond), size=(intHeight, intWidth), mode='bilinear', align_corners=False)
 #
-# 	tenFlow[:, 0, :, :] *= float(intWidth) / float(intPreprocessedWidth)
-# 	tenFlow[:, 1, :, :] *= float(intHeight) / float(intPreprocessedHeight)
+# 	flow_tensor[:, 0, :, :] *= float(intWidth) / float(intPreprocessedWidth)
+# 	flow_tensor[:, 1, :, :] *= float(intHeight) / float(intPreprocessedHeight)
 #
-# 	return tenFlow[0, :, :, :].cpu()
-# # end
+# 	return flow_tensor[0, :, :, :].cpu()
 #
-# ##########################################################
+#
+#
 #
 # if __name__ == '__main__':
-# 	tenFirst = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strFirst))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
-# 	tenSecond = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strSecond))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
+# 	first_tensor = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strFirst))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
+# 	second_tensor = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strSecond))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
 # 	#(3, 436, 1024)
-# 	tenOutput = estimate(tenFirst, tenSecond)
+# 	output_tensor = estimate(first_tensor, second_tensor)
 #
 # 	objOutput = open(arguments_strOut, 'wb')
 #
 # 	numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(objOutput)
-# 	numpy.array([ tenOutput.shape[2], tenOutput.shape[1] ], numpy.int32).tofile(objOutput)
-# 	numpy.array(tenOutput.detach().numpy().transpose(1, 2, 0), numpy.float32).tofile(objOutput)
+# 	numpy.array([ output_tensor.shape[2], output_tensor.shape[1] ], numpy.int32).tofile(objOutput)
+# 	numpy.array(output_tensor.detach().numpy().transpose(1, 2, 0), numpy.float32).tofile(objOutput)
 #
 # 	objOutput.close()
-# # end
+#
