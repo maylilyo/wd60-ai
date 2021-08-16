@@ -48,8 +48,11 @@ model = model.cuda()
 with torch.no_grad():
     # inference를 진행할 때 주로 사용하는 코드. 사용하지 않는 gradient를 끔으로써 연산 속도 증가
 
+    # tenFirst, tenSecond: (1, 3, height, width)
     img_out = model(tenFirst, tenSecond)
+    # img_out: (1, 3, height, width)
 
-    img_out = img_out.squeeze()  # dim=1인 차원 없애기 (3, 2, 4, 1) -> (3, 2, 4)
+    img_out = img_out.squeeze()
+    # img_out: (3, height, width)
 
 save_test_image(img_out, 'img_out.jpg')
