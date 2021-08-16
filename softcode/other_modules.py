@@ -5,32 +5,62 @@ from icecream import ic
 
 class context_extractor_layer(nn.Module):
     def __init__(self):
-        super(context_extractor_layer, self).__init__()
+        super().__init__()
         self.layer1 = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=32,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=3,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=32, out_channels=32,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
 
         self.layer2 = nn.Sequential(
-            nn.Conv2d(in_channels=32, out_channels=64,
-                      kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=64, out_channels=64,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
 
         self.layer3 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=96,
-                      kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=96,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=96, out_channels=96,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=96,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
 
     def forward(self, x):
@@ -49,33 +79,31 @@ class context_extractor_layer(nn.Module):
         return [layer1, layer2, layer3]
 
 
-# class Metric(torch.nn.Module):
-#     def __init__(self):
-#         super(Metric, self).__init__()
-#
-#         self.paramScale = torch.nn.Parameter(-torch.ones(1, 1, 1, 1))
-#
-#
-#     def forward(self, tenFirst, tenSecond, tenFlow):
-#         return self.paramScale * torch.nn.functional.l1_loss(input=tenFirst, target=backwarp(tenSecond, tenFlow)).mean(1, True)
-#
-#
 class Matric_UNet(nn.Module):
     def __init__(self):
-        super(Matric_UNet, self).__init__()
+        super().__init__()
 
         class Decoder(nn.Module):
             def __init__(self, l_num):
-                super(Decoder, self).__init__()
+                super().__init__()
 
                 self.conv_relu = nn.Sequential(
                     nn.ReLU(inplace=False),
-                    nn.Conv2d(in_channels=l_num*32*2, out_channels=l_num *
-                              32, kernel_size=3, stride=1, padding=1),
+                    nn.Conv2d(
+                        in_channels=l_num*32*2,
+                        out_channels=l_num*32,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    ),
                     nn.ReLU(inplace=False),
-                    nn.Conv2d(in_channels=l_num*32, out_channels=l_num *
-                              32, kernel_size=3, stride=1, padding=1),
-
+                    nn.Conv2d(
+                        in_channels=l_num*32,
+                        out_channels=l_num*32,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    ),
                 )
 
             def forward(self, x1, x2):
@@ -84,78 +112,164 @@ class Matric_UNet(nn.Module):
                 x1 = self.conv_relu(x1)
                 return x1
 
-        # 这个是把第一张图片从3通道变成12通道负责color consistency
+        # Color를 유지하면서 3 channels를 12 channels로 변경
         self.conv_img = nn.Conv2d(
-            in_channels=3, out_channels=12, kernel_size=3, stride=1, padding=1)
-        # 这个是把两张图片的loss从1通道变成4通道 负责计算背景的重要程度
+            in_channels=3,
+            out_channels=12,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
+        # 양쪽 사진의 loss를 1 channel에서 4 channels로 바꿈
+        # 동시에 background의 중요도를 계산
         self.conv_metric = nn.Conv2d(
-            in_channels=1, out_channels=4, kernel_size=3, stride=1, padding=1)
+            in_channels=1,
+            out_channels=4,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
         self.down_l1 = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=16, out_channels=32,
-                      kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels=16,
+                out_channels=32,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=32, out_channels=32,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
         )
         self.down_l2 = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=32, out_channels=64,
-                      kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=64, out_channels=64,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
         )
         self.down_l3 = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=64, out_channels=96,
-                      kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=96,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=96, out_channels=96,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=96,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
         )
         self.middle = nn.Sequential(
-            nn.Conv2d(in_channels=96, out_channels=96,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=96,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=96, out_channels=96,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=96,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
         self.up_l3 = nn.Sequential(
             nn.UpsamplingBilinear2d(scale_factor=2),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=96, out_channels=64,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=96,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=64, out_channels=64,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
         self.up_l2 = nn.Sequential(
             nn.UpsamplingBilinear2d(scale_factor=2),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=64, out_channels=32,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=32, out_channels=32,
-                      kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=False)
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
         )
         self.up_l1 = nn.Sequential(
             nn.UpsamplingBilinear2d(scale_factor=2),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=32, out_channels=16,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=16,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=16, out_channels=16,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=16,
+                out_channels=16,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
         )
         self.out_seq = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(in_channels=16, out_channels=1,
-                      kernel_size=3, stride=1, padding=1),
-            # 最后这个到底有没有有点慌
+            nn.Conv2d(
+                in_channels=16,
+                out_channels=1,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            # 중간 단계가 아니라 output 직전에 ReLU를 쓰는 게 이상함
             # nn.ReLU(inplace=False),
         )
         self.Decoder3 = Decoder(3)
