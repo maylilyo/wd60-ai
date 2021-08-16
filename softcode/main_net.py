@@ -7,8 +7,7 @@ from icecream import ic
 from gridnet.net_module import GridNet
 from pwc.utils.flow_utils import show_compare
 from pwc.pwc_network import Network as flow_net
-from softsplatting import softsplat
-from softsplatting.softsplat import FunctionSoftsplat
+from softsplatting.softsplat import _softspalt
 from softsplatting.run import backwarp
 from other_modules import context_extractor_layer, Matric_UNet
 
@@ -149,25 +148,25 @@ class Main_net(nn.Module):
         ic(self.beta1.shape)
         # beta1: (1,)
 
-        warped_img1 = FunctionSoftsplat(
+        warped_img1 = _softspalt(
             tenInput=img1,
             tenFlow=flow_1to2_pyramid[0] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
             strType='softmax',
         )
-        warped_pyramid1_1 = FunctionSoftsplat(
+        warped_pyramid1_1 = _softspalt(
             tenInput=feature_pyramid1[0],
             tenFlow=flow_1to2_pyramid[0] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
             strType='softmax',
         )
-        warped_pyramid1_2 = FunctionSoftsplat(
+        warped_pyramid1_2 = _softspalt(
             tenInput=feature_pyramid1[1],
             tenFlow=flow_1to2_pyramid[1] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[1],
             strType='softmax',
         )
-        warped_pyramid1_3 = FunctionSoftsplat(
+        warped_pyramid1_3 = _softspalt(
             tenInput=feature_pyramid1[2],
             tenFlow=flow_1to2_pyramid[2] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[2],
@@ -194,25 +193,25 @@ class Main_net(nn.Module):
         tenMetric_2to1 = self.Matric_UNet(tenMetric_2to1, img2)
         tenMetric_ls_2to1 = self.scale_tenMetric(tenMetric_2to1)
 
-        warped_img2 = FunctionSoftsplat(
+        warped_img2 = _softspalt(
             tenInput=img2,
             tenFlow=flow_2to1_pyramid[0] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
             strType='softmax',
         )
-        warped_pyramid2_1 = FunctionSoftsplat(
+        warped_pyramid2_1 = _softspalt(
             tenInput=feature_pyramid2[0],
             tenFlow=flow_2to1_pyramid[0] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
             strType='softmax',
         )
-        warped_pyramid2_2 = FunctionSoftsplat(
+        warped_pyramid2_2 = _softspalt(
             tenInput=feature_pyramid2[1],
             tenFlow=flow_2to1_pyramid[1] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[1],
             strType='softmax',
         )
-        warped_pyramid2_3 = FunctionSoftsplat(
+        warped_pyramid2_3 = _softspalt(
             tenInput=feature_pyramid2[2],
             tenFlow=flow_2to1_pyramid[2] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[2],

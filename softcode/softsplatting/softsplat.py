@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-
-import torch
+import re
 
 import cupy
-import re
+import torch
 
 kernel_Softsplat_updateOutput = '''
 	extern "C" __global__ void kernel_Softsplat_updateOutput(
@@ -176,197 +174,184 @@ kernel_Softsplat_updateGradFlow = '''
 	} }
 '''
 
-def cupy_kernel(strFunction, objVariables):
-	strKernel = globals()[strFunction]
 
-	while True:
-		objMatch = re.search('(SIZE_)([0-4])(\()([^\)]*)(\))', strKernel)
+def cupy_kernel(func_name, var_object):
+    kernel_name = globals()[func_name]
 
-		if objMatch is None:
-			break
-		# end
+    while True:
+        matched_object = re.search('(SIZE_)([0-4])(\()([^\)]*)(\))', kernel_name)
 
-		intArg = int(objMatch.group(2))
+        if matched_object is None:
+            break
 
-		strTensor = objMatch.group(4)
-		intSizes = objVariables[strTensor].size()
+        intArg = int(matched_object.group(2))
 
-		strKernel = strKernel.replace(objMatch.group(), str(intSizes[intArg]))
-	# end
+        tensor_name = matched_object.group(4)
+        intSizes = var_object[tensor_name].size()
 
-	while True:
-		objMatch = re.search('(OFFSET_)([0-4])(\()([^\)]+)(\))', strKernel)
+        kernel_name = kernel_name.replace(matched_object.group(), str(intSizes[intArg]))
 
-		if objMatch is None:
-			break
-		# end
+    while True:
+        matched_object = re.search('(OFFSET_)([0-4])(\()([^\)]+)(\))', kernel_name)
 
-		intArgs = int(objMatch.group(2))
-		strArgs = objMatch.group(4).split(',')
+        if matched_object is None:
+            break
 
-		strTensor = strArgs[0]
-		intStrides = objVariables[strTensor].stride()
-		strIndex = [ '((' + strArgs[intArg + 1].replace('{', '(').replace('}', ')').strip() + ')*' + str(intStrides[intArg]) + ')' for intArg in range(intArgs) ]
+        int_args = int(matched_object.group(2))
+        string_args = matched_object.group(4).split(',')
 
-		strKernel = strKernel.replace(objMatch.group(0), '(' + str.join('+', strIndex) + ')')
-	# end
+        tensor_name = string_args[0]
+        stride_list = var_object[tensor_name].stride()
+        index_list = ['((' + string_args[intArg + 1].replace('{', '(').replace('}', ')').strip() + ')*' +
+                      str(stride_list[intArg]) + ')' for intArg in range(int_args)]
 
-	while True:
-		objMatch = re.search('(VALUE_)([0-4])(\()([^\)]+)(\))', strKernel)
+        kernel_name = kernel_name.replace(matched_object.group(0), '(' + str.join('+', index_list) + ')')
 
-		if objMatch is None:
-			break
-		# end
+    while True:
+        matched_object = re.search('(VALUE_)([0-4])(\()([^\)]+)(\))', kernel_name)
 
-		intArgs = int(objMatch.group(2))
-		strArgs = objMatch.group(4).split(',')
+        if matched_object is None:
+            break
 
-		strTensor = strArgs[0]
-		intStrides = objVariables[strTensor].stride()
-		strIndex = [ '((' + strArgs[intArg + 1].replace('{', '(').replace('}', ')').strip() + ')*' + str(intStrides[intArg]) + ')' for intArg in range(intArgs) ]
+        int_args = int(matched_object.group(2))
+        string_args = matched_object.group(4).split(',')
 
-		strKernel = strKernel.replace(objMatch.group(0), strTensor + '[' + str.join('+', strIndex) + ']')
-	# end
+        tensor_name = string_args[0]
+        stride_list = var_object[tensor_name].stride()
 
-	return strKernel
-# end
+        index_list = []
+        for intArg in range(int_args):
+            tmp = string_args[intArg + 1].replace('{', '(').replace('}', ')').strip()
+            tmp = f'(({tmp})*{stride_list[intArg]})'
+            index_list.append(tmp)
+
+        kernel_name = kernel_name.replace(matched_object.group(0), tensor_name + '[' + str.join('+', index_list) + ']')
+
+    return kernel_name
+
 
 @cupy.memoize(for_each_device=True)
-def cupy_launch(strFunction, strKernel):
-	return cupy.cuda.compile_with_cache(strKernel).get_function(strFunction)
-# end
+def cupy_launch(func_name, kernel_name):
+    return cupy.cuda.compile_with_cache(kernel_name).get_function(func_name)
+
 
 class _FunctionSoftsplat(torch.autograd.Function):
-	@staticmethod
-	def forward(self, input, flow):
-		self.save_for_backward(input, flow)
+    @staticmethod
+    def forward(self, input, flow):
+        self.save_for_backward(input, flow)
 
-		intSamples = input.shape[0]
-		intInputDepth, intInputHeight, intInputWidth = input.shape[1], input.shape[2], input.shape[3]
-		intFlowDepth, intFlowHeight, intFlowWidth = flow.shape[1], flow.shape[2], flow.shape[3]
+        intSamples = input.shape[0]
+        intInputDepth, intInputHeight, intInputWidth = input.shape[1], input.shape[2], input.shape[3]
+        intFlowDepth, intFlowHeight, intFlowWidth = flow.shape[1], flow.shape[2], flow.shape[3]
 
-		assert(intFlowDepth == 2)
-		assert(intInputHeight == intFlowHeight)
-		assert(intInputWidth == intFlowWidth)
+        assert(intFlowDepth == 2)
+        assert(intInputHeight == intFlowHeight)
+        assert(intInputWidth == intFlowWidth)
 
-		assert(input.is_contiguous() == True)
-		assert(flow.is_contiguous() == True)
+        assert(input.is_contiguous() == True)
+        assert(flow.is_contiguous() == True)
 
-		output = input.new_zeros([ intSamples, intInputDepth, intInputHeight, intInputWidth ])
+        output = input.new_zeros([intSamples, intInputDepth, intInputHeight, intInputWidth])
 
-		if input.is_cuda == True:
-			n = output.nelement()
-			cupy_launch('kernel_Softsplat_updateOutput', cupy_kernel('kernel_Softsplat_updateOutput', {
-				'input': input,
-				'flow': flow,
-				'output': output
-			}))(
-				grid=tuple([ int((n + 512 - 1) / 512), 1, 1 ]),
-				block=tuple([ 512, 1, 1 ]),
-				args=[ n, input.data_ptr(), flow.data_ptr(), output.data_ptr() ]
-			)
+        if input.is_cuda == True:
+            n = output.nelement()
+            cupy_launch('kernel_Softsplat_updateOutput', cupy_kernel('kernel_Softsplat_updateOutput', {
+                'input': input,
+                'flow': flow,
+                'output': output
+            }))(
+                grid=tuple([int((n + 512 - 1) / 512), 1, 1]),
+                block=tuple([512, 1, 1]),
+                args=[n, input.data_ptr(), flow.data_ptr(), output.data_ptr()]
+            )
 
-		elif input.is_cuda == False:
-			raise NotImplementedError()
+        elif input.is_cuda == False:
+            raise NotImplementedError()
 
-		# end
+        return output
 
-		return output
-	# end
+    @staticmethod
+    def backward(self, gradOutput):
+        input, flow = self.saved_tensors
 
-	@staticmethod
-	def backward(self, gradOutput):
-		input, flow = self.saved_tensors
+        intSamples = input.shape[0]
+        intInputDepth, intInputHeight, intInputWidth = input.shape[1], input.shape[2], input.shape[3]
+        intFlowDepth, intFlowHeight, intFlowWidth = flow.shape[1], flow.shape[2], flow.shape[3]
 
-		intSamples = input.shape[0]
-		intInputDepth, intInputHeight, intInputWidth = input.shape[1], input.shape[2], input.shape[3]
-		intFlowDepth, intFlowHeight, intFlowWidth = flow.shape[1], flow.shape[2], flow.shape[3]
+        assert(intFlowDepth == 2)
+        assert(intInputHeight == intFlowHeight)
+        assert(intInputWidth == intFlowWidth)
 
-		assert(intFlowDepth == 2)
-		assert(intInputHeight == intFlowHeight)
-		assert(intInputWidth == intFlowWidth)
+        assert(gradOutput.is_contiguous() == True)
 
-		assert(gradOutput.is_contiguous() == True)
+        gradInput = input.new_zeros([intSamples, intInputDepth, intInputHeight, intInputWidth]) if self.needs_input_grad[0] == True else None
+        gradFlow = input.new_zeros([intSamples, intFlowDepth, intFlowHeight, intFlowWidth]) if self.needs_input_grad[1] == True else None
 
-		gradInput = input.new_zeros([ intSamples, intInputDepth, intInputHeight, intInputWidth ]) if self.needs_input_grad[0] == True else None
-		gradFlow = input.new_zeros([ intSamples, intFlowDepth, intFlowHeight, intFlowWidth ]) if self.needs_input_grad[1] == True else None
+        if input.is_cuda == True:
+            if gradInput is not None:
+                n = gradInput.nelement()
+                cupy_launch('kernel_Softsplat_updateGradInput', cupy_kernel('kernel_Softsplat_updateGradInput', {
+                    'input': input,
+                    'flow': flow,
+                    'gradOutput': gradOutput,
+                    'gradInput': gradInput,
+                    'gradFlow': gradFlow
+                }))(
+                    grid=tuple([int((n + 512 - 1) / 512), 1, 1]),
+                    block=tuple([512, 1, 1]),
+                    args=[n, input.data_ptr(), flow.data_ptr(), gradOutput.data_ptr(), gradInput.data_ptr(), None]
+                )
 
-		if input.is_cuda == True:
-			if gradInput is not None:
-				n = gradInput.nelement()
-				cupy_launch('kernel_Softsplat_updateGradInput', cupy_kernel('kernel_Softsplat_updateGradInput', {
-					'input': input,
-					'flow': flow,
-					'gradOutput': gradOutput,
-					'gradInput': gradInput,
-					'gradFlow': gradFlow
-				}))(
-					grid=tuple([ int((n + 512 - 1) / 512), 1, 1 ]),
-					block=tuple([ 512, 1, 1 ]),
-					args=[ n, input.data_ptr(), flow.data_ptr(), gradOutput.data_ptr(), gradInput.data_ptr(), None ]
-				)
-			# end
+            if gradFlow is not None:
+                n = gradFlow.nelement()
+                cupy_launch('kernel_Softsplat_updateGradFlow', cupy_kernel('kernel_Softsplat_updateGradFlow', {
+                    'input': input,
+                    'flow': flow,
+                    'gradOutput': gradOutput,
+                    'gradInput': gradInput,
+                    'gradFlow': gradFlow
+                }))(
+                    grid=tuple([int((n + 512 - 1) / 512), 1, 1]),
+                    block=tuple([512, 1, 1]),
+                    args=[n, input.data_ptr(), flow.data_ptr(), gradOutput.data_ptr(), None, gradFlow.data_ptr()]
+                )
 
-			if gradFlow is not None:
-				n = gradFlow.nelement()
-				cupy_launch('kernel_Softsplat_updateGradFlow', cupy_kernel('kernel_Softsplat_updateGradFlow', {
-					'input': input,
-					'flow': flow,
-					'gradOutput': gradOutput,
-					'gradInput': gradInput,
-					'gradFlow': gradFlow
-				}))(
-					grid=tuple([ int((n + 512 - 1) / 512), 1, 1 ]),
-					block=tuple([ 512, 1, 1 ]),
-					args=[ n, input.data_ptr(), flow.data_ptr(), gradOutput.data_ptr(), None, gradFlow.data_ptr() ]
-				)
-			# end
+        elif input.is_cuda == False:
+            raise NotImplementedError()
 
-		elif input.is_cuda == False:
-			raise NotImplementedError()
+        return gradInput, gradFlow
 
-		# end
 
-		return gradInput, gradFlow
-	# end
-# end
+def _softspalt(tenInput, tenFlow, tenMetric, _type):
+    assert(tenMetric is None or tenMetric.shape[1] == 1)
+    assert(_type in ['summation', 'average', 'linear', 'softmax'])
 
-def FunctionSoftsplat(tenInput, tenFlow, tenMetric, strType):
-	assert(tenMetric is None or tenMetric.shape[1] == 1)
-	assert(strType in ['summation', 'average', 'linear', 'softmax'])
+    if _type == 'average':
+        tenInput = torch.cat([tenInput, tenInput.new_ones(tenInput.shape[0], 1, tenInput.shape[2], tenInput.shape[3])], 1)
 
-	if strType == 'average':
-		tenInput = torch.cat([ tenInput, tenInput.new_ones(tenInput.shape[0], 1, tenInput.shape[2], tenInput.shape[3]) ], 1)
+    elif _type == 'linear':
+        tenInput = torch.cat([tenInput * tenMetric, tenMetric], 1)
 
-	elif strType == 'linear':
-		tenInput = torch.cat([ tenInput * tenMetric, tenMetric ], 1)
+    elif _type == 'softmax':
+        tenInput = torch.cat([tenInput * tenMetric.exp(), tenMetric.exp()], 1)
 
-	elif strType == 'softmax':
-		tenInput = torch.cat([ tenInput * tenMetric.exp(), tenMetric.exp() ], 1)
+    tenOutput = _FunctionSoftsplat.apply(tenInput, tenFlow)
 
-	# end
+    if _type != 'summation':
+        tenNormalize = tenOutput[:, -1:, :, :]
 
-	tenOutput = _FunctionSoftsplat.apply(tenInput, tenFlow)
+        tenNormalize[tenNormalize == 0.0] = 1.0
 
-	if strType != 'summation':
-		tenNormalize = tenOutput[:, -1:, :, :]
+        tenOutput = tenOutput[:, :-1, :, :] / tenNormalize
 
-		tenNormalize[tenNormalize == 0.0] = 1.0
+    return tenOutput
 
-		tenOutput = tenOutput[:, :-1, :, :] / tenNormalize
-	# end
-
-	return tenOutput
-# end
 
 class ModuleSoftsplat(torch.nn.Module):
-	def __init__(self, strType):
-		super(ModuleSoftsplat, self).__init__()
+    def __init__(self, _type):
+        super().__init__()
 
-		self.strType = strType
-	# end
+        self._type = _type
 
-	def forward(self, tenInput, tenFlow, tenMetric):
-		return FunctionSoftsplat(tenInput, tenFlow, tenMetric, self.strType)
-	# end
-# end
+    def forward(self, tenInput, tenFlow, tenMetric):
+        return _softspalt(tenInput, tenFlow, tenMetric, self._type)
