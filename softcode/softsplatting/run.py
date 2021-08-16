@@ -11,7 +11,9 @@ backwarp_cache = {}
 
 def backwarp(input_tensor, flow_tensor):
     key = flow_tensor.shape
-    if key not in backwarp_cache:
+    if key in backwarp_cache:
+        backwarped_tensor = backwarp_cache[key]
+    else:
         horizontal_tensor = torch.linspace(
             start=-1.0 + (1.0 / flow_tensor.shape[3]),
             end=1.0 - (1.0 / flow_tensor.shape[3]),
@@ -32,8 +34,6 @@ def backwarp(input_tensor, flow_tensor):
         backwarped_tensor = backwarped_tensor.cuda()
 
         backwarp_cache[key] = backwarped_tensor
-    else:
-        backwarped_tensor = backwarp_cache[key]
 
     flow_tensor = torch.cat(
         tensors=[
