@@ -152,25 +152,25 @@ class Main_net(nn.Module):
             tenInput=img1,
             tenFlow=flow_1to2_pyramid[0] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid1_1 = _softspalt(
             tenInput=feature_pyramid1[0],
             tenFlow=flow_1to2_pyramid[0] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid1_2 = _softspalt(
             tenInput=feature_pyramid1[1],
             tenFlow=flow_1to2_pyramid[1] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[1],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid1_3 = _softspalt(
             tenInput=feature_pyramid1[2],
             tenFlow=flow_1to2_pyramid[2] * 0.5,
             tenMetric=self.beta1 * tenMetric_ls_1to2[2],
-            strType='softmax',
+            _type='softmax',
         )
 
         ic(warped_img1.shape)
@@ -197,25 +197,25 @@ class Main_net(nn.Module):
             tenInput=img2,
             tenFlow=flow_2to1_pyramid[0] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid2_1 = _softspalt(
             tenInput=feature_pyramid2[0],
             tenFlow=flow_2to1_pyramid[0] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid2_2 = _softspalt(
             tenInput=feature_pyramid2[1],
             tenFlow=flow_2to1_pyramid[1] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[1],
-            strType='softmax',
+            _type='softmax',
         )
         warped_pyramid2_3 = _softspalt(
             tenInput=feature_pyramid2[2],
             tenFlow=flow_2to1_pyramid[2] * 0.5,
             tenMetric=self.beta2 * tenMetric_ls_2to1[2],
-            strType='softmax',
+            _type='softmax',
         )
 
         # warped_img2: (num_batches, 3, height, width)
