@@ -41,7 +41,7 @@ tenSecond = normalize_image(img3)
 tenSecond = tenSecond.cuda()
 
 model = Main_net(shape)  # nn.Module
-model.load_state_dict(torch.load('weights/model_weight_41.pth'))
+model.load_state_dict(torch.load('weights/softsplat.pt'))
 model.eval()  # layer의 동작을 inference로 바꿔줌. no_grad와 함께 사용한다.
 model = model.cuda()
 

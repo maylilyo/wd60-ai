@@ -78,7 +78,7 @@ def train():
             total_loss += loss
         print(f'epoch: {step:3d} avg loss: {total_loss.item()/train_length}')
         if (step+1) % 3 == 0:
-            torch.save(model, f'./weights/model_weight_{step:02d}.pth')
+            torch.save(model, f'./weights/model_weight_{step:02d}.pt')
 
 
 if __name__ == '__main__':
