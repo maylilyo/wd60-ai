@@ -7,39 +7,37 @@ from gridnet.modules import LateralBlock, DownSamplingBlock, UpSamplingBlock
 
 class GridNet(nn.Module):
     # Image Synthesis Network
-    def __init__(self, out_chs=3, grid_chs=[32, 64, 96]):
-        # n_row = 3, n_col = 6, n_chs = [32, 64, 96]):
+    def __init__(self, num_out_channel=3, grid_channel_list=[32, 64, 96]):
+        # num_row = 3, num_column = 6, num_channel_list = [32, 64, 96]):
         super().__init__()
 
-        self.n_row = 3
-        self.n_col = 6
-        self.n_chs = grid_chs
+        self.num_row = 3
+        self.num_column = 6
+        self.num_channel_list = grid_channel_list
 
-        assert len(
-            grid_chs) == self.n_row, 'should give num channels for each row (scale stream)'
+        assert len(grid_channel_list) == self.num_row, 'should give num channels for each row (scale stream)'
 
-        self.lateral_init = LateralBlock(70, self.n_chs[0])
+        self.lateral_init = LateralBlock(70, self.num_channel_list[0])
 
-        for r, n_ch in enumerate(self.n_chs):
-            for c in range(self.n_col - 1):
-                setattr(self, f'lateral_{r}_{c}', LateralBlock(n_ch, n_ch))
+        for r, num_channel in enumerate(self.num_channel_list):
+            for c in range(self.num_column - 1):
+                setattr(self, f'lateral_{r}_{c}', LateralBlock(num_channel, num_channel))
 
-        for r, (in_ch, out_ch) in enumerate(zip(self.n_chs[:-1], self.n_chs[1:])):
-            for c in range(int(self.n_col / 2)):
+        for r, (input_channel, output_channel) in enumerate(zip(self.num_channel_list[:-1], self.num_channel_list[1:])):
+            for c in range(int(self.num_column / 2)):
                 # 00, 10일 때 예외처리
                 if r == 0 and c == 0:
-                    setattr(self, f'down_{r}_{c}', LateralBlock(128, out_ch))
+                    setattr(self, f'down_{r}_{c}', LateralBlock(128, output_channel))
                 elif r == 1 and c == 0:
-                    setattr(self, f'down_{r}_{c}', LateralBlock(192, out_ch))
+                    setattr(self, f'down_{r}_{c}', LateralBlock(192, output_channel))
                 else:
-                    setattr(self, f'down_{r}_{c}',
-                            DownSamplingBlock(in_ch, out_ch))
+                    setattr(self, f'down_{r}_{c}', DownSamplingBlock(input_channel, output_channel))
 
-        for r, (in_ch, out_ch) in enumerate(zip(self.n_chs[1:], self.n_chs[:-1])):
-            for c in range(int(self.n_col / 2)):
-                setattr(self, f'up_{r}_{c}', UpSamplingBlock(in_ch, out_ch))
+        for r, (input_channel, output_channel) in enumerate(zip(self.num_channel_list[1:], self.num_channel_list[:-1])):
+            for c in range(int(self.num_column / 2)):
+                setattr(self, f'up_{r}_{c}', UpSamplingBlock(input_channel, output_channel))
 
-        self.lateral_final = LateralBlock(self.n_chs[0], out_chs)
+        self.lateral_final = LateralBlock(self.num_channel_list[0], num_out_channel)
 
     def forward(self, x_l1, x_l2, x_l3):
         # x_l1: [num_batches, 70, 256, 448]
@@ -90,6 +88,6 @@ if __name__ == '__main__':
     x_l1 = torch.rand(size=(N, 70, H, W)).cuda()
     x_l2 = torch.rand(size=(N, 128, H//2, W//2)).cuda()
     x_l3 = torch.rand(size=(N, 192, H//4, W//4)).cuda()
-    model = GridNet(out_chs=3).cuda()
+    model = GridNet(num_out_channel=3).cuda()
     res = model(x_l1, x_l2, x_l3)
     print(res.shape)
