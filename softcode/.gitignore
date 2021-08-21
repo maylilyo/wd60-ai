@@ -1,2 +1,5 @@
 data/
 result/
+*.pt
+pwc/weights/*.pth
+/weights/*.pth
