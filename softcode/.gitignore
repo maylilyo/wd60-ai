@@ -1,5 +1,5 @@
 data/
 result/
 *.pt
-pwc/weights/*.pth
-/weights/*.pth
+softcode/pwc/weights/*.pth
+softcode/weights/*.pth
