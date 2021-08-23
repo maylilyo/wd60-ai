@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from model.warplayer import warp
 from model.refine import *
+from icecream import ic
 
 
 def deconv(
@@ -47,6 +49,7 @@ def conv(
 
 
 class IFBlock(nn.Module):
+    #Coarse-to-Fine structure
     def __init__(
         self,
         in_planes,
@@ -57,6 +60,7 @@ class IFBlock(nn.Module):
             conv(in_planes, c//2, 3, 2, 1),
             conv(c//2, c, 3, 2, 1),
         )
+        #conv, stride=2 x 2
         self.convblock = nn.Sequential(
             conv(c, c),
             conv(c, c),
@@ -66,6 +70,7 @@ class IFBlock(nn.Module):
             conv(c, c),
             conv(c, c),
             conv(c, c),
+            #conv, stride=1 x 8
         )
         self.lastconv = nn.ConvTranspose2d(c, 5, 4, 2, 1)
 
@@ -117,6 +122,7 @@ class IFNet(nn.Module):
         self.unet = Unet()
 
     def forward(self, x, scale=[4, 2, 1]):
+        # x = [img0(0, 1, 2), img1(3, 4, 5), gt(6)]
         img0 = x[:, :3]
         img1 = x[:, 3:6]
         gt = x[:, 6:]  # In inference time, gt is None
@@ -129,6 +135,8 @@ class IFNet(nn.Module):
         loss_distill = 0
         stu = [self.block0, self.block1, self.block2]
 
+        # img0, img1 : (batch_size/2, 3, 224, 224)
+        # gt : (batch_size/2, 3, 224, 224)
         for i in range(3):
             if flow != None:
                 flow_d, mask_d = stu[i](torch.cat((img0, img1, warped_img0, warped_img1, mask), 1), flow, scale=scale[i])
@@ -167,4 +175,11 @@ class IFNet(nn.Module):
         res = tmp[:, :3] * 2 - 1
         merged[2] = torch.clamp(merged[2] + res, 0, 1)
 
+        ic(flow_list[0].shape)
+        ic(flow_list[1].shape)
+        ic(flow_list[2].shape)
+        ic(merged[0].shape, len(merged))
+        
         return flow_list, mask_list[2], merged, flow_teacher, merged_teacher, loss_distill
+        #flow_list, mask_list[2], merged 중 필요한게 뭐지? 각각 논문에서 뭔지?merged[2]
+        #pwc넷에 2는 뭔지?
