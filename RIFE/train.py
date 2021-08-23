@@ -17,7 +17,7 @@ from torch.utils.data.distributed import DistributedSampler
 device = torch.device("cuda")
 
 exp = os.path.abspath('.').split('/')[-1]
-log_path = 'result/'
+log_path = 'result'
 
 
 def get_learning_rate(step):
@@ -50,7 +50,8 @@ def train(model, local_rank):
     sampler = DistributedSampler(dataset)
     train_data = DataLoader(
         dataset,
-        batch_size=args.batch_size,
+        batch_size=2,
+        #batch_size=args.batch_size,
         num_workers=8,
         pin_memory=True,
         drop_last=True,
@@ -61,7 +62,8 @@ def train(model, local_rank):
     dataset_val = VimeoDataset('validation')
     val_data = DataLoader(
         dataset_val,
-        batch_size=16,
+        batch_size=2,
+        #batch_size=16,
         pin_memory=True,
         num_workers=8,
     )
