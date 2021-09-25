@@ -1,9 +1,12 @@
+import itertools
+
 import torch
 import torch.nn as nn
 import numpy as np
 from torch.optim import AdamW
 import torch.optim as optim
-import itertools
+from icecream import ic
+
 from model.warplayer import warp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from model.IFNet import *
@@ -81,6 +84,9 @@ class Model:
 
         img0 = imgs[:, :3]
         img1 = imgs[:, 3:]
+        #imgs = (batch_size, 3 * 2, height, width)
+        #img0 = (batch_size, 3, height, width)
+        #img1 = (batch_size, 3, height, width)
 
         if training:
             self.train()
