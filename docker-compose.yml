@@ -3,9 +3,10 @@ services:
   dev:
     image: sehandev/softsplat
     ports:
-      - "8080:8888"
+      - "8888:8888"
     volumes:
-      - ./softcode:/workspace
+      - .:/workspace
+      - /home/wd60/data:/workspace/data
     environment:
       - TZ=Asis/Seoul
       - DEBIAN_FRONTEND=noninteractive
