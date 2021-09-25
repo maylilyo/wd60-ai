@@ -1,19 +1,9 @@
-import itertools
-
 import torch
-import torch.nn as nn
-import numpy as np
 from torch.optim import AdamW
-import torch.optim as optim
-from icecream import ic
-
-from model.warplayer import warp
 from torch.nn.parallel import DistributedDataParallel as DDP
-from model.IFNet import *
-import torch.nn.functional as F
-from model.loss import *
-from model.laplacian import *
-from model.refine import *
+
+from model.IFNet import IFNet
+from model.loss import EPE, LapLoss, SOBEL
 
 device = torch.device("cuda")
 
@@ -63,7 +53,7 @@ class Model:
         res = torch.sigmoid(refine_output[:, :3]) * 2 - 1
         pred = merged + res
         pred = torch.clamp(pred, 0, 1)
-        if training:            
+        if training:
             return pred, merged
         else:
             return pred
@@ -72,7 +62,7 @@ class Model:
     def inference(self, img0, img1, scale_list=[4, 2, 1], TTA=False):
         imgs = torch.cat((img0, img1), 1)
         flow, mask, merged, flow_teacher, merged_teacher, loss_distill = self.flownet(imgs, scale_list)
-        if TTA == False:
+        if not TTA:
             return merged[2]
         else:
             flow2, mask2, merged2, flow_teacher2, merged_teacher2, loss_distill2 = self.flownet(imgs.flip(2).flip(3), scale_list)
@@ -82,11 +72,12 @@ class Model:
         for param_group in self.optimG.param_groups:
             param_group['lr'] = learning_rate
 
-        img0 = imgs[:, :3]
-        img1 = imgs[:, 3:]
-        #imgs = (batch_size, 3 * 2, height, width)
-        #img0 = (batch_size, 3, height, width)
-        #img1 = (batch_size, 3, height, width)
+        # img0 = imgs[:, :3]
+        # img1 = imgs[:, 3:]
+
+        # imgs: (batch_size, 3 * 2, height, width)
+        # img0: (batch_size, 3, height, width)
+        # img1: (batch_size, 3, height, width)
 
         if training:
             self.train()
@@ -105,7 +96,7 @@ class Model:
         else:
             flow_teacher = flow[2]
             merged_teacher = merged[2]
-            
+
         return merged[2], {
             'merged_tea': merged_teacher,
             'mask': mask,
