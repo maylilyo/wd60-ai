@@ -77,7 +77,7 @@ class GridNet(nn.Module):
         # state_13, 14, 15 : [num_batches, 64, 128, 224]
         # state_03, 04, 05 : [num_batches, 32, 256, 448]
 
-        print(self.lateral_final(state_05).shape)
+        # print(self.lateral_final(state_05).shape)
         return self.lateral_final(state_05)
 
 

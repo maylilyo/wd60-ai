@@ -368,7 +368,7 @@ class Refiner(nn.Module):
         return self.refiner(input_tensor)
 
 
-class Network(nn.Module):
+class Network(nn.Module):  # flownet
     def __init__(self):
         super().__init__()
 
