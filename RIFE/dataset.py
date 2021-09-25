@@ -1,11 +1,10 @@
-import os
-
 import cv2
-import ast
 import torch
 import numpy as np
 import random
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
+
+import config as cfg
 
 cv2.setNumThreads(1)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,13 +16,11 @@ class VimeoDataset(Dataset):
         self.dataset_name = dataset_name
         self.h = 256
         self.w = 448
-        self.data_root = '../data/vimeo_triplet'
-        self.image_root = os.path.join(self.data_root, 'sequences')
-        train_fn = os.path.join(self.data_root, 'tri_trainlist.txt')
-        test_fn = os.path.join(self.data_root, 'tri_testlist.txt')
-        with open(train_fn, 'r') as f:
+        self.data_root = cfg.DATA_DIR / 'vimeo_triplet'
+        self.image_root = self.data_root / 'sequences'
+        with open(self.data_root / 'tri_trainlist.txt', 'r') as f:
             self.trainlist = f.read().splitlines()
-        with open(test_fn, 'r') as f:
+        with open(self.data_root / 'tri_testlist.txt', 'r') as f:
             self.testlist = f.read().splitlines()
 
         self.load_data()
@@ -49,7 +46,7 @@ class VimeoDataset(Dataset):
     def getimg(self, index):
         imgpath = self.meta_data[index]
         imgpaths = [imgpath + '/im1.png', imgpath + '/im2.png', imgpath + '/im3.png']
-        imgpaths = [self.image_root + '/' + imgpath for imgpath in imgpaths]
+        imgpaths = [self.image_root / imgpath for imgpath in imgpaths]
 
         # Load images
         img0 = cv2.imread(imgpaths[0])
