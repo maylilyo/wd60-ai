@@ -11,7 +11,14 @@ from main_net import Main_net
 from loss_f import LapLoss
 
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# from pathlib import Path
+# PROJECT_DIR = Path(__file__).absolute().parent.parent
+# DATA_DIR = PROJECT_DIR / 'data'
+
+tmp_dir = os.path.dirname('/workspace/')
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+current_dir = tmp_dir
 vimeo_data_dir = os.path.join(current_dir, 'data/vimeo_triplet')
 
 seed = 42
@@ -68,7 +75,7 @@ def train():
             # loss = torch.nn.functional.l1_loss(img_out,tar)
             loss = criteration(img_out, tar)
 
-            t.zero_grad()
+            optimizer.zero_grad()
 
             loss.backward()
             optimizer.step()
@@ -83,4 +90,4 @@ def train():
 
 if __name__ == '__main__':
     set_seed(seed)
-    # train()
+    train()

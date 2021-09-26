@@ -1,11 +1,11 @@
-import cv2
+# import cv2
 import torch
 import torch.nn as nn
 from torch.nn.functional import interpolate, l1_loss
 from icecream import ic
 
 from gridnet.net_module import GridNet
-from pwc.utils.flow_utils import show_compare
+# from pwc.utils.flow_utils import show_compare
 from pwc.pwc_network import Network as flow_net
 from softsplatting.softsplat import _softspalt
 from softsplatting.run import backwarp
@@ -92,6 +92,8 @@ class Main_net(nn.Module):
         flow_1to2 = self.flow_extractor1to2(img1, img2)
         flow_2to1 = self.flow_extractor1to2(img2, img1)
 
+        ic(img1.shape)
+        ic(img2.shape)
         ic(flow_1to2.shape)
         ic(flow_2to1.shape)
 
@@ -101,7 +103,8 @@ class Main_net(nn.Module):
         flow_2to1_pyramid = self.scale_flow(flow_2to1)
 
         # TEST
-        # show_compare(flow_1to2_pyramid[0].squeeze().cpu().detach().numpy().transpose(1,2,0), flow_1to2_pyramid[0].squeeze().cpu().detach().numpy().transpose(1,2,0))
+        # show_compare(flow_1to2_pyramid[0].squeeze().cpu().detach().numpy().transpose(1,2,0),
+        # flow_1to2_pyramid[0].squeeze().cpu().detach().numpy().transpose(1,2,0))
 
         ic(len(flow_1to2_pyramid))
         ic(flow_1to2_pyramid[0].shape)
