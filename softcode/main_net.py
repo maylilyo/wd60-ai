@@ -6,8 +6,8 @@ from icecream import ic
 
 from gridnet.net_module import GridNet
 # from pwc.utils.flow_utils import show_compare
-from pwc.pwc_network import Network as flow_net
-from pwc.pwc_network import Network as rife_flow_net
+from pwc.pwc_network import Network as PWCNet
+from ifnet.ifnet import IFNet
 
 from softsplatting.softsplat import _softspalt
 from softsplatting.run import backwarp
@@ -18,7 +18,7 @@ class Main_net(nn.Module):
     def __init__(self, shape):
         super().__init__()
 
-        self.tag = 'softsplat'
+        self.tag = 'pwcnet'  # pwcnet, ifnet
         self.shape = shape
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
@@ -27,11 +27,11 @@ class Main_net(nn.Module):
         self.Matric_UNet = Matric_UNet()
         self.grid_net = GridNet()
 
-        if self.tag == 'softsplat':
-            self.flow_extractor1to2 = flow_net()
-            self.flow_extractor2to1 = flow_net()
-        elif self.tag == 'rife':
-            self.flow_extractor = rife_flow_net()
+        if self.tag == 'pwcnet':
+            self.flow_extractor1to2 = PWCNet()
+            self.flow_extractor2to1 = PWCNet()
+        elif self.tag == 'ifnet':
+            self.flow_extractor = IFNet()
 
     def scale_flow_zero(self, flow):
         SCALE = 20.0
@@ -115,11 +115,11 @@ class Main_net(nn.Module):
         flow_1to2_zero = self.scale_flow_zero(flow_1to2)
         flow_2to1_zero = self.scale_flow_zero(flow_2to1)
 
-        if self.tag == 'softsplat':
+        if self.tag == 'pwcnet':
             flow_1tot = flow_1to2 * 0.5
             flow_2tot = flow_2to1 * 0.5
 
-        elif self.tag == 'rife':
+        elif self.tag == 'ifnet':
             flow_all = self.flow_extractor(img1, img2)
             channel = flow_all.shape[1] // 2
             flow_1tot = flow_all[:, :channel]
