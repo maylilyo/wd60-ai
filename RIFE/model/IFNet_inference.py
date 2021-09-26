@@ -6,7 +6,7 @@ from model.warplayer import warp
 from model.refine import *
 from icecream import ic
 
-#remove deconv layer
+# remove deconv layer
 def conv(
     in_planes,
     out_planes,
@@ -30,7 +30,7 @@ def conv(
 
 
 class IFBlock(nn.Module):
-    #Coarse-to-Fine structure
+    # Coarse-to-Fine structure
     def __init__(
         self,
         in_planes,

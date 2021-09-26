@@ -49,7 +49,7 @@ def conv(
 
 
 class IFBlock(nn.Module):
-    #Coarse-to-Fine structure
+    # Coarse-to-Fine structure
     def __init__(
         self,
         in_planes,
@@ -60,7 +60,7 @@ class IFBlock(nn.Module):
             conv(in_planes, c//2, 3, 2, 1),
             conv(c//2, c, 3, 2, 1),
         )
-        #conv, stride=2 x 2
+        # conv, stride=2 x 2
         self.convblock = nn.Sequential(
             conv(c, c),
             conv(c, c),
@@ -70,7 +70,7 @@ class IFBlock(nn.Module):
             conv(c, c),
             conv(c, c),
             conv(c, c),
-            #conv, stride=1 x 8
+            # conv, stride=1 x 8
         )
         self.lastconv = nn.ConvTranspose2d(c, 5, 4, 2, 1)
 
@@ -181,5 +181,5 @@ class IFNet(nn.Module):
         ic(merged[0].shape, len(merged))
         
         return flow_list, mask_list[2], merged, flow_teacher, merged_teacher, loss_distill
-        #flow_list, mask_list[2], merged 중 필요한게 뭐지? 각각 논문에서 뭔지?merged[2]
-        #pwc넷에 2는 뭔지?
+        # flow_list, mask_list[2], merged 중 필요한게 뭐지? 각각 논문에서 뭔지?merged[2]
+        # pwc넷에 2는 뭔지?
