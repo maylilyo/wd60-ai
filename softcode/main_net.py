@@ -7,6 +7,8 @@ from icecream import ic
 from gridnet.net_module import GridNet
 # from pwc.utils.flow_utils import show_compare
 from pwc.pwc_network import Network as flow_net
+from pwc.pwc_network import Network as rife_flow_net
+
 from softsplatting.softsplat import _softspalt
 from softsplatting.run import backwarp
 from other_modules import context_extractor_layer, Matric_UNet
@@ -16,15 +18,32 @@ class Main_net(nn.Module):
     def __init__(self, shape):
         super().__init__()
 
+        self.tag = 'softsplat'
         self.shape = shape
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
-        self.flow_extractor1to2 = flow_net()
-        self.flow_extractor2to1 = flow_net()
         self.beta1 = nn.Parameter(torch.Tensor([-1]))
         self.beta2 = nn.Parameter(torch.Tensor([-1]))
         self.Matric_UNet = Matric_UNet()
         self.grid_net = GridNet()
+
+        if self.tag == 'softsplat':
+            self.flow_extractor1to2 = flow_net()
+            self.flow_extractor2to1 = flow_net()
+        elif self.tag == 'rife':
+            self.flow_extractor = rife_flow_net()
+
+    def scale_flow_zero(self, flow):
+        SCALE = 20.0
+        intHeight, intWidth = self.shape[2:]
+
+        raw_scaled = (SCALE / 1) * interpolate(
+            input=flow,
+            size=(intHeight, intWidth),
+            mode='bilinear',
+            align_corners=False,
+        )
+        return raw_scaled
 
     def scale_flow(self, flow):
         # https://github.com/sniklaus/softmax-splatting/issues/12
@@ -91,16 +110,26 @@ class Main_net(nn.Module):
 
         flow_1to2 = self.flow_extractor1to2(img1, img2)
         flow_2to1 = self.flow_extractor1to2(img2, img1)
-
-        ic(img1.shape)
-        ic(img2.shape)
-        ic(flow_1to2.shape)
-        ic(flow_2to1.shape)
-
         # flow_1to2, flow_2to1: (num_batches, 2, height / 4, width / 4)
 
-        flow_1to2_pyramid = self.scale_flow(flow_1to2)
-        flow_2to1_pyramid = self.scale_flow(flow_2to1)
+        flow_1to2_zero = self.scale_flow_zero(flow_1to2)
+        flow_2to1_zero = self.scale_flow_zero(flow_2to1)
+
+        if self.tag == 'softsplat':
+            flow_1tot = flow_1to2 * 0.5
+            flow_2tot = flow_2to1 * 0.5
+
+        elif self.tag == 'rife':
+            flow_all = self.flow_extractor(img1, img2)
+            channel = flow_all.shape[1] // 2
+            flow_1tot = flow_all[:, :channel]
+            flow_2tot = flow_all[:, channel:]
+
+        flow_1to2_pyramid = self.scale_flow(flow_1tot)
+        flow_2to1_pyramid = self.scale_flow(flow_2tot)
+
+        target_1to2 = backwarp(img2, flow_1to2_zero)
+        target_2to1 = backwarp(img1, flow_2to1_zero)
 
         # TEST
         # show_compare(flow_1to2_pyramid[0].squeeze().cpu().detach().numpy().transpose(1,2,0),
@@ -118,13 +147,9 @@ class Main_net(nn.Module):
 
         # ↓ Softmax Splatting
 
-        target = backwarp(img2, flow_1to2_pyramid[0])
-        ic(target.shape)
-        # target: (num_batches, 3, height, width)
-
         tenMetric_1to2 = l1_loss(
             input=img1,
-            target=target,
+            target=target_1to2,
             reduction='none',
         )
         ic(tenMetric_1to2.shape)
@@ -149,29 +174,32 @@ class Main_net(nn.Module):
         # quarter_scaled: (num_batches, 1, height / 4, width / 4)
 
         ic(self.beta1.shape)
+
+        # for i in range(3):
+        #     print(nn.MSELoss()(tmp_pyramid[i], flow_1to2_pyramid[i] * 0.5))
         # beta1: (1,)
 
         warped_img1 = _softspalt(
             tenInput=img1,
-            tenFlow=flow_1to2_pyramid[0] * 0.5,
+            tenFlow=flow_1to2_pyramid[0],
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
             _type='softmax',
         )
         warped_pyramid1_1 = _softspalt(
             tenInput=feature_pyramid1[0],
-            tenFlow=flow_1to2_pyramid[0] * 0.5,
+            tenFlow=flow_1to2_pyramid[0],
             tenMetric=self.beta1 * tenMetric_ls_1to2[0],
             _type='softmax',
         )
         warped_pyramid1_2 = _softspalt(
             tenInput=feature_pyramid1[1],
-            tenFlow=flow_1to2_pyramid[1] * 0.5,
+            tenFlow=flow_1to2_pyramid[1],
             tenMetric=self.beta1 * tenMetric_ls_1to2[1],
             _type='softmax',
         )
         warped_pyramid1_3 = _softspalt(
             tenInput=feature_pyramid1[2],
-            tenFlow=flow_1to2_pyramid[2] * 0.5,
+            tenFlow=flow_1to2_pyramid[2],
             tenMetric=self.beta1 * tenMetric_ls_1to2[2],
             _type='softmax',
         )
@@ -186,10 +214,9 @@ class Main_net(nn.Module):
         # warped_pyramid1_2: (num_batches, 64, height / 2, width / 2)
         # warped_pyramid1_3: (num_batches, 96, height / 4, width / 4)
 
-        target = backwarp(img1, flow_2to1_pyramid[0])
         tenMetric_2to1 = l1_loss(
             input=img2,
-            target=target,
+            target=target_2to1,
             reduction='none',
         )
         tenMetric_2to1 = tenMetric_2to1.mean(1, True)
@@ -198,25 +225,25 @@ class Main_net(nn.Module):
 
         warped_img2 = _softspalt(
             tenInput=img2,
-            tenFlow=flow_2to1_pyramid[0] * 0.5,
+            tenFlow=flow_2to1_pyramid[0],
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
             _type='softmax',
         )
         warped_pyramid2_1 = _softspalt(
             tenInput=feature_pyramid2[0],
-            tenFlow=flow_2to1_pyramid[0] * 0.5,
+            tenFlow=flow_2to1_pyramid[0],
             tenMetric=self.beta2 * tenMetric_ls_2to1[0],
             _type='softmax',
         )
         warped_pyramid2_2 = _softspalt(
             tenInput=feature_pyramid2[1],
-            tenFlow=flow_2to1_pyramid[1] * 0.5,
+            tenFlow=flow_2to1_pyramid[1],
             tenMetric=self.beta2 * tenMetric_ls_2to1[1],
             _type='softmax',
         )
         warped_pyramid2_3 = _softspalt(
             tenInput=feature_pyramid2[2],
-            tenFlow=flow_2to1_pyramid[2] * 0.5,
+            tenFlow=flow_2to1_pyramid[2],
             tenMetric=self.beta2 * tenMetric_ls_2to1[2],
             _type='softmax',
         )
