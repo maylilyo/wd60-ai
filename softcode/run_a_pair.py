@@ -1,8 +1,6 @@
 import numpy as np
 import torch
 import cv2
-from torchvision.utils import save_image
-from icecream import ic
 
 from main_net import Main_net
 from test import save_test_image
@@ -30,7 +28,7 @@ def normalize_image(img):
 
 height = 256
 width = 448
-shape = [1, 3, height, width]
+shape = [height, width]
 
 img1, img2, img3 = read_sample_images()
 

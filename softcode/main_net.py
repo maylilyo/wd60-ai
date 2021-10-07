@@ -19,7 +19,7 @@ class Main_net(nn.Module):
         super().__init__()
 
         self.tag = 'pwcnet'  # pwcnet, ifnet
-        self.shape = shape
+        self.shape = shape  # [height, width]
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
         self.beta1 = nn.Parameter(torch.Tensor([-1]))
@@ -35,7 +35,7 @@ class Main_net(nn.Module):
 
     def scale_flow_zero(self, flow):
         SCALE = 20.0
-        intHeight, intWidth = self.shape[2:]
+        intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
             input=flow,
@@ -49,7 +49,7 @@ class Main_net(nn.Module):
         # https://github.com/sniklaus/softmax-splatting/issues/12
 
         SCALE = 20.0
-        intHeight, intWidth = self.shape[2:]
+        intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
             input=flow,
@@ -68,7 +68,7 @@ class Main_net(nn.Module):
         return [raw_scaled, half_scaled, quarter_scaled]
 
     def scale_tenMetric(self, tenMetric):
-        intHeight, intWidth = self.shape[2:]
+        intHeight, intWidth = self.shape
 
         raw_scaled = tenMetric
         half_scaled = interpolate(

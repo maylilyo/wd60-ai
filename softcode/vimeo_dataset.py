@@ -40,14 +40,13 @@ class Vimeo(Dataset):
     def get_file_ls(self):
         tri_img = ['im1.png', 'im2.png', 'im3.png']
         total_res_ls = []
-        with open(f'{self.base_dir}/tri_trainlist.txt', 'r') as f:
+        with open(self.base_dir / 'tri_trainlist.txt', 'r') as f:
             each_ls = f.readlines()
             for each in each_ls:
                 each = each.strip('\n')
                 tmp_p_ls = []
                 for sub in tri_img:
-                    tmp_p_ls.append(self.base_dir + '/' +
-                                    'sequences' + '/' + each + '/' + sub)
+                    tmp_p_ls.append(self.base_dir / 'sequences' / each / sub)
                 total_res_ls.append(tmp_p_ls)
         return total_res_ls
 

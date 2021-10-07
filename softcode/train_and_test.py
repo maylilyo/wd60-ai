@@ -1,28 +1,22 @@
-import os
+from pathlib import Path
+from tqdm import tqdm
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from icecream import ic
 
 from vimeo_dataset import Vimeo
 from main_net import Main_net
 from loss_f import LapLoss
 
 
-
-# from pathlib import Path
-# PROJECT_DIR = Path(__file__).absolute().parent.parent
-# DATA_DIR = PROJECT_DIR / 'data'
-
-tmp_dir = os.path.dirname('/workspace/')
-# current_dir = os.path.dirname(os.path.abspath(__file__))
-current_dir = tmp_dir
-vimeo_data_dir = os.path.join(current_dir, 'data/vimeo_triplet')
+PROJECT_DIR = Path(__file__).absolute().parent.parent
+WEIGHT_DIR = PROJECT_DIR / 'weights'
+DATA_DIR = PROJECT_DIR / 'data'
+VIMEO_DIR = DATA_DIR / 'vimeo_triplet'
 
 seed = 42
-batch_size = 1
+batch_size = 2
 max_epochs = 100
 num_workers = 0
 crop = False
@@ -41,7 +35,7 @@ def set_seed(seed):
 
 def train():
     criteration = LapLoss()
-    vimeo_dataset = Vimeo(base_dir=vimeo_data_dir)
+    vimeo_dataset = Vimeo(base_dir=VIMEO_DIR)
     train_loader = DataLoader(
         dataset=vimeo_dataset,
         batch_size=batch_size,
@@ -50,7 +44,7 @@ def train():
         pin_memory=True,
     )
 
-    shape = [batch_size, 3, H, W]
+    shape = [H, W]
     model = Main_net(shape)
     model = model.train(True)
     optimizer = torch.optim.Adam(
@@ -61,31 +55,31 @@ def train():
 
     model = model.cuda()
 
-    for step in range(max_epochs):
+    for epoch in range(max_epochs):
         total_loss = 0
-        train_length = len(train_loader)
-        for ix, data in enumerate(train_loader):
-            img1, img2, tar = data
+        with tqdm(train_loader) as pbar:
+            for data in pbar:
+                img1, img2, tar = data
 
-            img1 = img1.cuda()
-            img2 = img2.cuda()
-            tar = tar.cuda()
+                img1 = img1.cuda()
+                img2 = img2.cuda()
+                tar = tar.cuda()
 
-            img_out = model(img1, img2)
-            # loss = torch.nn.functional.l1_loss(img_out,tar)
-            loss = criteration(img_out, tar)
+                img_out = model(img1, img2)
+                # loss = torch.nn.functional.l1_loss(img_out,tar)
+                loss = criteration(img_out, tar)
 
-            optimizer.zero_grad()
+                optimizer.zero_grad()
 
-            loss.backward()
-            optimizer.step()
-            if ix % 5 == 0:
-                print(f'Epoch: {ix:3d}/{train_length} - lr: {lr}')
-                print(f'loss value: {loss.item()}')
-            total_loss += loss
-        print(f'epoch: {step:3d} avg loss: {total_loss.item()/train_length}')
-        if (step+1) % 3 == 0:
-            torch.save(model, f'./weights/model_weight_{step:02d}.pt')
+                loss.backward()
+                optimizer.step()
+
+                pbar.set_postfix({'train_loss': loss.item()})
+                total_loss += loss
+        print(
+            f'Epoch: {epoch:02d} loss: {total_loss.item() / len(train_loader)}')
+        if (epoch+1) % 3 == 0:
+            torch.save(model, WEIGHT_DIR / f'epoch_{epoch:02d}.pt')
 
 
 if __name__ == '__main__':
