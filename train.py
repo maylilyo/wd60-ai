@@ -42,7 +42,7 @@ trainer = Trainer(
     progress_bar_refresh_rate=1 if cfg.IS_PROGRESS_LOG_ON else 0,
     accelerator='dp',
     deterministic=True,
-    precision=16,
+    # precision=16,
     callbacks=[
         early_stop_callback,
         checkpoint_callback,
@@ -57,7 +57,6 @@ data_module = CustomDataModule(
 
 module = CustomModule(
     model_option=cfg.model_option,
-    max_epochs=cfg.MAX_EPOCHS,
     learning_rate=cfg.LEARNING_RATE,
     criterion_name=cfg.CRITERION,
     optimizer_name=cfg.OPTIMIZER,
@@ -72,7 +71,6 @@ print(f'Best model : {checkpoint_callback.best_model_path}')
 module = CustomModule.load_from_checkpoint(
     checkpoint_callback.best_model_path,
     model_option=cfg.model_option,
-    max_epochs=cfg.MAX_EPOCHS,
     learning_rate=cfg.LEARNING_RATE,
     criterion_name=cfg.CRITERION,
     optimizer_name=cfg.OPTIMIZER,

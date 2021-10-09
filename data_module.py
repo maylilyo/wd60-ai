@@ -39,7 +39,7 @@ class CustomDataModule(LightningDataModule):
         return DataLoader(
             self.valid_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=self.num_workers,
         )
 
@@ -47,6 +47,6 @@ class CustomDataModule(LightningDataModule):
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=self.num_workers,
         )

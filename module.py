@@ -15,7 +15,6 @@ class CustomModule(pl.LightningModule):
     def __init__(
         self,
         model_option,
-        max_epoch,
         learning_rate=1e-2,
         criterion_name='RMSE',
         optimizer_name='Adam',
@@ -23,7 +22,6 @@ class CustomModule(pl.LightningModule):
         momentum=0.9,
     ):
         super().__init__()
-        self.max_epoch = max_epoch
         self.learning_rate = learning_rate
         self.momentum = momentum
 
@@ -90,10 +88,11 @@ class CustomModule(pl.LightningModule):
 
         raise ValueError(f'{scheduler_name} is not on the custom scheduler list!')
 
-    def forward(self, x):
-        # x : (batch_size, ???)
+    def forward(self, img1, img2):
+        # img1: (batch_size, ???)
+        # img2: (batch_size, ???)
 
-        out = self.model(x)
+        out = self.model(img1, img2)
         # out : (batch_size, ???)
 
         return out
@@ -105,19 +104,15 @@ class CustomModule(pl.LightningModule):
         }
 
     def common_step(self, batch, state):
-        x, y = batch
-        # x: (batch_size, ???)
+        img1, img2, y = batch
+        # img1: (batch_size, ???)
+        # img2: (batch_size, ???)
         # y: (batch_size, ???)
 
-        y_hat = self(x)
+        y_hat = self(img1, img2)
         # y_hat: (batch_size, ???)
 
-        loss = 0
-        for batch_y_hat, batch_y in zip(y_hat, y):
-            batch_loss = self.criterion(batch_y_hat, batch_y)
-            loss += batch_loss
-
-        loss /= len(y_hat)
+        loss = self.criterion(y_hat, y)
 
         return loss
 
