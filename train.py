@@ -20,7 +20,7 @@ wandb_logger = WandbLogger(
 )
 
 early_stop_callback = EarlyStopping(
-    monitor='val_loss',
+    monitor='valid',
     min_delta=0.00,
     patience=cfg.EARLYSTOP_PATIENCE,
     verbose=False,
@@ -28,7 +28,7 @@ early_stop_callback = EarlyStopping(
 )
 
 checkpoint_callback = ModelCheckpoint(
-    monitor='val_loss',
+    monitor='valid',
     dirpath='./checkout/',
     filename=cfg.PROJECT_TITLE + '-{epoch:04d}-{val_loss:.5f}',
     save_top_k=1,
