@@ -16,17 +16,22 @@ DATA_DIR = PROJECT_DIR / 'data'
 VIMEO_DIR = DATA_DIR / 'vimeo_triplet'
 
 seed = 42
-batch_size = 2
-max_epochs = 100
+batch_size = 8
+max_epochs = 10
 num_workers = 0
 crop = False
-if crop:
-    W = 256
-    H = 256
-else:
-    W = 448
-    H = 256
 lr = 1e-4
+
+if crop:
+    width = 256
+    height = 256
+else:
+    width = 448
+    height = 256
+
+model_option = {
+    'shape': [height, width],
+}
 
 
 def set_seed(seed):
@@ -44,8 +49,7 @@ def train():
         pin_memory=True,
     )
 
-    shape = [H, W]
-    model = Main_net(shape)
+    model = Main_net(model_option)
     model = model.train(True)
     optimizer = torch.optim.Adam(
         params=model.parameters(),
@@ -76,8 +80,7 @@ def train():
 
                 pbar.set_postfix({'train_loss': loss.item()})
                 total_loss += loss
-        print(
-            f'Epoch: {epoch:02d} loss: {total_loss.item() / len(train_loader)}')
+        print(f'Epoch: {epoch:02d} loss: {total_loss.item() / len(train_loader)}')
         if (epoch+1) % 3 == 0:
             torch.save(model, WEIGHT_DIR / f'epoch_{epoch:02d}.pt')
 

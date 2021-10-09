@@ -15,11 +15,11 @@ from other_modules import context_extractor_layer, Matric_UNet
 
 
 class Main_net(nn.Module):
-    def __init__(self, shape):
+    def __init__(self, model_option):
         super().__init__()
 
         self.tag = 'pwcnet'  # pwcnet, ifnet
-        self.shape = shape  # [height, width]
+        self.shape = model_option['shape']  # [height, width]
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
         self.beta1 = nn.Parameter(torch.Tensor([-1]))
