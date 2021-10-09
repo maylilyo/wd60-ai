@@ -3,7 +3,7 @@ import numpy
 import torch
 import torch.nn.functional as F
 
-from softsplatting.softsplat import _softspalt
+from .softsplat import _softspalt
 
 
 backwarp_cache = {}

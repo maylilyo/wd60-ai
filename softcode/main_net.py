@@ -4,14 +4,14 @@ import torch.nn as nn
 from torch.nn.functional import interpolate, l1_loss
 from icecream import ic
 
-from gridnet.net_module import GridNet
+from .gridnet.net_module import GridNet
 # from pwc.utils.flow_utils import show_compare
-from pwc.pwc_network import Network as PWCNet
-from ifnet.ifnet import IFNet
+from .pwc.pwc_network import Network as PWCNet
+from .ifnet.ifnet import IFNet
 
-from softsplatting.softsplat import _softspalt
-from softsplatting.run import backwarp
-from other_modules import context_extractor_layer, Matric_UNet
+from .softsplatting.softsplat import _softspalt
+from .softsplatting.run import backwarp
+from .other_modules import context_extractor_layer, Matric_UNet
 
 
 class Main_net(nn.Module):

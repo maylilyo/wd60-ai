@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from icecream import ic
 
-from gridnet.modules import LateralBlock, DownSamplingBlock, UpSamplingBlock
+from .modules import LateralBlock, DownSamplingBlock, UpSamplingBlock
 
 
 class GridNet(nn.Module):

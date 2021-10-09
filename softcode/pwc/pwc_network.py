@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pwc.utils.constv import ConstV
+from .utils.constv import ConstV
 from .correlation import correlation
 
 # torch.set_grad_enabled(False) # make sure to not compute gradients for computational performance
