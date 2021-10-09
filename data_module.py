@@ -23,9 +23,8 @@ class CustomDataModule(LightningDataModule):
         self.set_datasets()
 
     def set_datasets(self):
-        vimeo_dataset = Vimeo(base_dir=self.vimeo_dir)
-        print('Vimeo train dataset length:', len(vimeo_dataset))
-        self.train_dataset, self.valid_dataset = random_split(vimeo_dataset, [50000, 10000])
+        vimeo_dataset = Vimeo(base_dir=self.vimeo_dir)  # length: 51313
+        self.train_dataset, self.valid_dataset = random_split(vimeo_dataset, [48000, 3313])
         self.test_dataset = self.valid_dataset
 
     def train_dataloader(self):
