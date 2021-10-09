@@ -79,38 +79,39 @@ class context_extractor_layer(nn.Module):
         return [layer1, layer2, layer3]
 
 
+class Decoder(nn.Module):
+    def __init__(self, l_num):
+        super().__init__()
+
+        self.conv_relu = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.Conv2d(
+                in_channels=l_num*32*2,
+                out_channels=l_num*32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(
+                in_channels=l_num*32,
+                out_channels=l_num*32,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+        )
+
+    def forward(self, x1, x2):
+
+        x1 = torch.cat((x1, x2), dim=1)
+        x1 = self.conv_relu(x1)
+        return x1
+
+
 class Matric_UNet(nn.Module):
     def __init__(self):
         super().__init__()
-
-        class Decoder(nn.Module):
-            def __init__(self, l_num):
-                super().__init__()
-
-                self.conv_relu = nn.Sequential(
-                    nn.ReLU(inplace=False),
-                    nn.Conv2d(
-                        in_channels=l_num*32*2,
-                        out_channels=l_num*32,
-                        kernel_size=3,
-                        stride=1,
-                        padding=1,
-                    ),
-                    nn.ReLU(inplace=False),
-                    nn.Conv2d(
-                        in_channels=l_num*32,
-                        out_channels=l_num*32,
-                        kernel_size=3,
-                        stride=1,
-                        padding=1,
-                    ),
-                )
-
-            def forward(self, x1, x2):
-
-                x1 = torch.cat((x1, x2), dim=1)
-                x1 = self.conv_relu(x1)
-                return x1
 
         # Color를 유지하면서 3 channels를 12 channels로 변경
         self.conv_img = nn.Conv2d(
