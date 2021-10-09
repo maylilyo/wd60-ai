@@ -86,6 +86,7 @@ class Main_net(nn.Module):
         return [raw_scaled, half_scaled, quarter_scaled]
 
     def forward(self, img1, img2):
+        torch.backends.cudnn.benchmark = False
         ic.disable()
 
         ic(img1.shape)

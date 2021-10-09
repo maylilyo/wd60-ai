@@ -179,18 +179,23 @@ class Decoder(nn.Module):
                 tensors=[horizontal_tensor, vertical_tensor],
                 dim=1,
             )
-            backwarped_tensor = backwarped_tensor.cuda()
+            # backwarped_tensor = backwarped_tensor.cuda()
+            backwarped_tensor = backwarped_tensor.type_as(flow_tensor)
 
-            # Save grid to cache
-            Decoder.grid_cache[key] = backwarped_tensor
+            # # Save grid to cache
+            # Decoder.grid_cache[key] = backwarped_tensor
 
-        if key in Decoder.partial_cache:
-            partial_tensor = Decoder.partial_cache[key]
-        else:
-            partial_tensor = flow_tensor.new_ones([flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
+        # if key in Decoder.partial_cache:
+        #     partial_tensor = Decoder.partial_cache[key]
+        # else:
+        #     partial_tensor = flow_tensor.new_ones([flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
+        #     partial_tensor = partial_tensor.type_as(input_tensor)
 
-            # Save partial to cache
-            Decoder.partial_cache[key] = partial_tensor
+        #     # Save partial to cache
+        #     Decoder.partial_cache[key] = partial_tensor
+
+        partial_tensor = flow_tensor.new_ones([flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
+        partial_tensor = partial_tensor.type_as(flow_tensor)
 
         flow_tensor = torch.cat(
             tensors=[

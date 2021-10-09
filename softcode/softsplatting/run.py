@@ -31,9 +31,10 @@ def backwarp(input_tensor, flow_tensor):
         vertical_tensor = vertical_tensor.expand(-1, -1, -1, flow_tensor.shape[3])
 
         backwarped_tensor = torch.cat([horizontal_tensor, vertical_tensor], 1)
-        backwarped_tensor = backwarped_tensor.cuda()
+        backwarped_tensor = backwarped_tensor.type_as(flow_tensor)
+        # backwarped_tensor = backwarped_tensor.cuda()
 
-        backwarp_cache[key] = backwarped_tensor
+        # backwarp_cache[key] = backwarped_tensor
 
     flow_tensor = torch.cat(
         tensors=[
