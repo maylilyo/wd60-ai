@@ -113,6 +113,7 @@ class CustomModule(pl.LightningModule):
         # y_hat: (batch_size, ???)
 
         loss = self.criterion(y_hat, y)
+        loss /= len(y)
 
         return loss
 
