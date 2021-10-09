@@ -1,0 +1,77 @@
+# Standard
+
+# PIP
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+
+# Custom
+
+
+class RMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+
+    def forward(self, yhat, y):
+        return torch.sqrt(self.mse(yhat, y))
+
+
+class LapLoss(nn.Module):
+    def __init__(self, max_levels=5, k_size=5, sigma=2.0):
+        super().__init__()
+        self.max_levels = max_levels
+        self.k_size = k_size
+        self.sigma = sigma
+        self._gauss_kernel = None
+
+    @staticmethod
+    def build_gauss_kernel(size=5, sigma=1.0, n_channels=1, cuda=False):
+        if size % 2 != 1:
+            raise ValueError("kernel size must be uneven")
+        grid = np.float32(np.mgrid[0:size, 0:size].T)
+        def gaussian(x): return np.exp((x - size // 2) ** 2 / (-2 * sigma ** 2)) ** 2
+        kernel = np.sum(gaussian(grid), axis=2)
+        kernel /= np.sum(kernel)
+        # repeat same kernel across depth dimension
+        kernel = np.tile(kernel, (n_channels, 1, 1))
+        # conv weight should be (out_channels, groups/in_channels, h, w),
+        # and since we have depth-separable convolution we want the groups dimension to be 1
+        kernel = torch.FloatTensor(kernel[:, None, :, :])
+        if cuda:
+            kernel = kernel.cuda()
+        return Variable(kernel, requires_grad=False)
+
+    @staticmethod
+    def conv_gauss(img, kernel):
+        """ convolve img with a gaussian kernel that has been built with build_gauss_kernel """
+        n_channels, _, kw, kh = kernel.shape
+        img = torch.nn.functional.pad(img, (kw // 2, kh // 2, kw // 2, kh // 2), mode='replicate')
+        return torch.nn.functional.conv2d(img, kernel, groups=n_channels)
+
+    def laplacian_pyramid(self, img, kernel, max_levels=5):
+        current = img
+        pyr = []
+
+        for level in range(max_levels):
+            filtered = self.conv_gauss(current, kernel)
+            diff = current - filtered
+            pyr.append(diff)
+            current = torch.nn.functional.avg_pool2d(filtered, 2)
+
+        pyr.append(current)
+        return pyr
+
+    def forward(self, input, target):
+        if self._gauss_kernel is None or self._gauss_kernel.shape[1] != input.shape[1]:
+            self._gauss_kernel = self.build_gauss_kernel(
+                size=self.k_size, sigma=self.sigma,
+                n_channels=input.shape[1], cuda=input.is_cuda
+            )
+        pyr_input = self.laplacian_pyramid(input, self._gauss_kernel, self.max_levels)
+        pyr_target = self.laplacian_pyramid(target, self._gauss_kernel, self.max_levels)
+
+        weights = [1, 2, 4, 8, 16, 32]
+
+        return sum(weights[i]*torch.nn.functional.l1_loss(a, b) for i, (a, b) in enumerate(zip(pyr_input, pyr_target))).mean()
