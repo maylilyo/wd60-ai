@@ -1,12 +1,14 @@
 import numpy as np
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
+from torch.autograd import Variable
+
+
 def build_gauss_kernel(size=5, sigma=1.0, n_channels=1, cuda=False):
     if size % 2 != 1:
         raise ValueError("kernel size must be uneven")
     grid = np.float32(np.mgrid[0:size, 0:size].T)
-    gaussian = lambda x: np.exp((x - size // 2) ** 2 / (-2 * sigma ** 2)) ** 2
+    def gaussian(x): return np.exp((x - size // 2) ** 2 / (-2 * sigma ** 2)) ** 2
     kernel = np.sum(gaussian(grid), axis=2)
     kernel /= np.sum(kernel)
     # repeat same kernel across depth dimension
@@ -59,4 +61,4 @@ class LapLoss(nn.Module):
 
         weights = [1, 2, 4, 8, 16, 32]
 
-        return sum(weights[i]*torch.nn.functional.l1_loss(a, b) for i, (a, b) in  enumerate(zip(pyr_input, pyr_target))).mean()
+        return sum(weights[i]*torch.nn.functional.l1_loss(a, b) for i, (a, b) in enumerate(zip(pyr_input, pyr_target))).mean()
