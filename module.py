@@ -28,6 +28,7 @@ class CustomModule(pl.LightningModule):
         self.model = CustomModel(model_option)
 
         self.criterion = self.get_loss_function(criterion_name)
+        self.metric_function = self.get_loss_function('SSIM')
         self.optimizer = self.get_optimizer(optimizer_name)
         self.lr_scheduler = self.get_lr_scheduler(lr_scheduler_name)
 
@@ -47,6 +48,8 @@ class CustomModule(pl.LightningModule):
             return nn.BCEWithLogitsLoss()
         elif name == 'LapLoss'.lower():
             return c_loss.LapLoss()
+        elif name == 'SSIM'.lower():
+            return c_loss.SSIM()
 
         raise ValueError(f'{loss_function_name} is not on the custom criterion list!')
 
@@ -82,7 +85,7 @@ class CustomModule(pl.LightningModule):
         elif name == 'StepLR'.lower():
             return StepLR(
                 optimizer=self.optimizer,
-                step_size=10,
+                step_size=2,
                 gamma=0.1,
             )
 
@@ -114,8 +117,14 @@ class CustomModule(pl.LightningModule):
 
         loss = self.criterion(y_hat, y)
         loss /= len(y)
+        if state == 'train':
+            return loss
 
-        return loss
+        if state == 'valid' or state == 'test':
+            metric = self.metric_function(y_hat, y)
+            metric /= len(y)
+
+            return loss, metric
 
     def training_step(self, batch, batch_idx):
 
@@ -126,12 +135,14 @@ class CustomModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        loss = self.common_step(batch, state='valid')
+        loss, metric = self.common_step(batch, state='valid')
 
-        self.log('val_loss', loss, prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
+        self.log('valid', loss, prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
+        self.log('ssim', metric, prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
 
     def test_step(self, batch, batch_idx):
 
-        loss = self.common_step(batch, state='test')
+        loss, metric = self.common_step(batch, state='test')
 
         self.log('test_loss', loss, sync_dist=True)
+        self.log('metric', metric, sync_dist=True)
