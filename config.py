@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 
 class Config:
     # User Setting
-    SEED = 42
+    SEED = 0
 
     # Path
     PROJECT_DIR = Path(__file__).absolute().parent
@@ -19,19 +19,19 @@ class Config:
 
     # Training
     GPUS = [0, 1, 2, 3]
-    MAX_EPOCHS = 20
-    EARLYSTOP_PATIENCE = 10
-    BATCH_SIZE = 8
+    MAX_EPOCHS = 100
+    EARLYSTOP_PATIENCE = 100
+    BATCH_SIZE = 32
     LEARNING_RATE = 1e-4
     CRITERION = 'LapLoss'
-    OPTIMIZER = 'Adam'
+    OPTIMIZER = 'AdamW'
     LR_SCHEDULER = 'StepLR'
 
     # Model
     IS_CROP = False
 
     # Dataset
-    SEQ_LEN = 10
+    NUM_WORKERS = 16
 
     # Log
     PROJECT_TITLE = 'Softsplat'
