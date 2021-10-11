@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 
 class Config:
     # User Setting
-    SEED = 0
+    SEED = 2
 
     # Path
     PROJECT_DIR = Path(__file__).absolute().parent
@@ -18,10 +18,10 @@ class Config:
     WEIGHT_DIR = PROJECT_DIR / 'weights'
 
     # Training
-    GPUS = [0, 1, 2, 3]
+    GPUS = [1, 2, 3]
     MAX_EPOCHS = 100
     EARLYSTOP_PATIENCE = 100
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
     LEARNING_RATE = 1e-4
     CRITERION = 'LapLoss'
     OPTIMIZER = 'AdamW'
@@ -39,6 +39,8 @@ class Config:
     IS_PROGRESS_LOG_ON = True
 
     def __init__(self, seed=None):
+        Config.BATCH_SIZE *= len(Config.GPUS)
+
         self.set_random_seed(seed)
         self.set_model_option()
 
