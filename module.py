@@ -85,8 +85,8 @@ class CustomModule(pl.LightningModule):
         elif name == 'StepLR'.lower():
             return StepLR(
                 optimizer=self.optimizer,
-                step_size=2,
-                gamma=0.1,
+                step_size=20,
+                gamma=0.5,
             )
 
         raise ValueError(f'{scheduler_name} is not on the custom scheduler list!')
@@ -117,32 +117,29 @@ class CustomModule(pl.LightningModule):
 
         loss = self.criterion(y_hat, y)
         loss /= len(y)
-        if state == 'train':
-            return loss
 
-        if state == 'valid' or state == 'test':
-            metric = self.metric_function(y_hat, y)
-            metric /= len(y)
+        metric = self.metric_function(y_hat, y)
 
-            return loss, metric
+        return loss, metric
 
     def training_step(self, batch, batch_idx):
 
-        loss = self.common_step(batch, state='train')
+        loss, metric = self.common_step(batch, state='train')
 
         self.log('train_loss', loss)
+        self.log('train_ssim', metric)
         return loss
 
     def validation_step(self, batch, batch_idx):
 
         loss, metric = self.common_step(batch, state='valid')
 
-        self.log('valid', loss, prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
-        self.log('ssim', metric, prog_bar=True, sync_dist=True, on_step=False, on_epoch=True)
+        self.log('valid_loss', loss, sync_dist=True)
+        self.log('valid_ssim', metric, sync_dist=True)
 
     def test_step(self, batch, batch_idx):
 
         loss, metric = self.common_step(batch, state='test')
 
         self.log('test_loss', loss, sync_dist=True)
-        self.log('metric', metric, sync_dist=True)
+        self.log('test_ssim', metric, sync_dist=True)
