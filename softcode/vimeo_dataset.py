@@ -27,21 +27,29 @@ class StaticCenterCrop(object):
 
 
 class Vimeo(Dataset):
-    def __init__(self, base_dir, augument=False, transform=None):
-        self.width = 448
-        self.height = 256
+    def __init__(
+        self,
+        base_dir,
+        augument=False,
+        transform=None,
+        state='train',  # train, test
+    ):
+        self.base_dir = base_dir
         self.augument = augument
         self.transform = transform
-        self.base_dir = base_dir
+
+        self.width = 448
+        self.height = 256
         self.crop_shape = (256, 256)
         self.cropper = 'random'
+        self.file_name = f'tri_{state}list.txt'
 
         self.files_dir_ls = self.get_file_ls()
 
     def get_file_ls(self):
         tri_img = ['im1.png', 'im2.png', 'im3.png']
         total_res_ls = []
-        with open(self.base_dir / 'tri_trainlist.txt', 'r') as f:
+        with open(self.base_dir / self.file_name, 'r') as f:
             each_ls = f.readlines()
             for each in each_ls:
                 each = each.strip('\n')

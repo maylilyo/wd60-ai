@@ -1,7 +1,7 @@
 # Standard
 
 # PIP
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from pytorch_lightning import LightningDataModule
 
 # Custom
@@ -23,8 +23,8 @@ class CustomDataModule(LightningDataModule):
         self.set_datasets()
 
     def set_datasets(self):
-        vimeo_dataset = Vimeo(base_dir=self.vimeo_dir)  # length: 51313
-        self.train_dataset, self.valid_dataset = random_split(vimeo_dataset, [48000, 3313])
+        self.train_dataset = Vimeo(base_dir=self.vimeo_dir, state='train')  # length: 51313
+        self.valid_dataset = Vimeo(base_dir=self.vimeo_dir, state='test')  # length: 3783
         self.test_dataset = self.valid_dataset
 
     def train_dataloader(self):
