@@ -18,7 +18,7 @@ class Main_net(nn.Module):
     def __init__(self, model_option):
         super().__init__()
 
-        self.flow_extractor = model_option['flow_extractor']  # pwcnet, ifnet
+        self.flow_net_name = model_option['flow_extractor']  # pwcnet, ifnet
         self.shape = model_option['shape']  # [height, width]
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
@@ -27,16 +27,16 @@ class Main_net(nn.Module):
         self.Matric_UNet = Matric_UNet()
         self.grid_net = GridNet()
 
-        if self.flow_extractor == 'pwcnet':
-            self.flow_extractor1to2 = PWCNet()
-        elif self.flow_extractor == 'ifnet':
-            self.flow_extractor1to2 = IFNet()
+        if self.flow_net_name == 'pwcnet':
+            self.flow_extractor = PWCNet()
+        elif self.flow_net_name == 'ifnet':
+            self.flow_extractor = IFNet()
 
     def scale_flow_zero(self, flow):
-        if self.flow_extractor == 'ifnet':
-            SCALE = 1.0
-        elif self.flow_extractor == 'pwcnet':
+        if self.flow_net_name == 'pwcnet':
             SCALE = 20.0
+        elif self.flow_net_name == 'ifnet':
+            SCALE = 1.0
         intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
@@ -50,10 +50,10 @@ class Main_net(nn.Module):
     def scale_flow(self, flow):
         # https://github.com/sniklaus/softmax-splatting/issues/12
 
-        if self.flow_extractor == 'ifnet':
-            SCALE = 1.0
-        elif self.flow_extractor == 'pwcnet':
+        if self.flow_net_name == 'pwcnet':
             SCALE = 20.0
+        elif self.flow_net_name == 'ifnet':
+            SCALE = 1.0
         intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
@@ -96,7 +96,6 @@ class Main_net(nn.Module):
         return [raw_scaled, half_scaled, quarter_scaled]
 
     def forward(self, img1, img2):
-        torch.backends.cudnn.benchmark = False
         ic.disable()
 
         ic(img1.shape)
@@ -118,23 +117,24 @@ class Main_net(nn.Module):
         # layer3: (num_batches, 96, height / 4, width / 4)
 
         # ↓ Optical Flow Estimator
+        if self.flow_net_name == 'pwcnet':
 
-        flow_1to2 = self.flow_extractor1to2(img1, img2)
-        flow_2to1 = self.flow_extractor1to2(img2, img1)
-        # flow_1to2, flow_2to1: (num_batches, 2, height / 4, width / 4)
+            flow_1to2 = self.flow_extractor(img1, img2)
+            flow_2to1 = self.flow_extractor(img2, img1)
+            # flow_1to2, flow_2to1: (num_batches, 2, height / 4, width / 4)
 
-        flow_1to2_zero = self.scale_flow_zero(flow_1to2)
-        flow_2to1_zero = self.scale_flow_zero(flow_2to1)
+            flow_1to2_zero = self.scale_flow_zero(flow_1to2)
+            flow_2to1_zero = self.scale_flow_zero(flow_2to1)
 
-        if self.flow_extractor == 'pwcnet':
             flow_1tot = flow_1to2 * 0.5
             flow_2tot = flow_2to1 * 0.5
 
-        elif self.flow_extractor == 'ifnet':
-            flow_all = self.flow_extractor1to2(img1, img2)
-            channel = flow_all.shape[1] // 2
-            flow_1tot = flow_all[:, :channel]
-            flow_2tot = flow_all[:, channel:]
+        elif self.flow_net_name == 'ifnet':
+            flow_all = self.flow_extractor(img1, img2)
+            flow_1tot = flow_all[:, :2]
+            flow_1to2_zero = flow_1tot
+            flow_2tot = flow_all[:, 2:]
+            flow_2to1_zero = flow_2tot
 
         flow_1to2_pyramid = self.scale_flow(flow_1tot)
         flow_2to1_pyramid = self.scale_flow(flow_2tot)

@@ -4,6 +4,7 @@ import json
 import time
 
 # PIP
+import torch
 import pytorch_lightning as pl
 
 # Custom
@@ -53,6 +54,7 @@ class Config:
             self.SEED = seed
 
         pl.seed_everything(self.SEED)
+        torch.backends.cudnn.benchmark = False
 
     def set_model_option(self):
         if self.IS_CROP:
