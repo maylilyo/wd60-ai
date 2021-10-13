@@ -1,5 +1,4 @@
 # Standard
-import time
 
 # PIP
 import torch
@@ -17,7 +16,7 @@ cfg = Config()
 
 wandb_logger = WandbLogger(
     project=cfg.PROJECT_TITLE,
-    name=cfg.WANDB_NAME,
+    name=cfg.MODEL_ID,
 )
 
 early_stop_callback = EarlyStopping(
@@ -77,6 +76,10 @@ module = CustomModule.load_from_checkpoint(
     lr_scheduler_name=cfg.LR_SCHEDULER,
 )
 
-model_id = int(time.time())
-torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{model_id}.pt')
-cfg.save_options(model_id)
+torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{cfg.MODEL_ID}.pt')
+
+additional_log = {
+    'valid_loss': float(trainer.callback_metrics['valid_loss']),
+    'valid_ssim': float(trainer.callback_metrics['valid_ssim']),
+}
+cfg.save_options(additional_log)

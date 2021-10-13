@@ -1,6 +1,7 @@
 # Standard
 from pathlib import Path
 import json
+import time
 
 # PIP
 import pytorch_lightning as pl
@@ -10,7 +11,7 @@ import pytorch_lightning as pl
 
 class Config:
     # User Setting
-    SEED = 2
+    SEED = 3
 
     # Path
     PROJECT_DIR = Path(__file__).absolute().parent
@@ -31,13 +32,14 @@ class Config:
 
     # Model
     IS_CROP = False
+    FLOW_EXTRACTOR = 'ifnet'  # pwcnet, ifnet
 
     # Dataset
     NUM_WORKERS = 16
 
     # Log
+    MODEL_ID = str(int(time.time()))
     PROJECT_TITLE = 'Softsplat'
-    WANDB_NAME = 'pwcnet'
     IS_PROGRESS_LOG_ON = True
 
     def __init__(self, seed=None):
@@ -62,16 +64,26 @@ class Config:
 
         self.model_option = {
             'shape': [height, width],
+            'flow_extractor': self.FLOW_EXTRACTOR,
         }
 
-    def save_options(self, model_id):
+    def save_options(self, additional_log):
         # Set option dict
         option_dict = {
             'is_crop': self.IS_CROP,
+            'flow_extractor': self.FLOW_EXTRACTOR,
+            'train_option': {
+                'max_epochs': self.MAX_EPOCHS,
+                'seed': self.SEED,
+                'gpus': len(self.GPUS),
+                'batch_size': self.BATCH_SIZE,
+                'learning_rate': self.LEARNING_RATE,
+            },
+            'additional_log': additional_log,
         }
 
         # Save dict to json
-        with open(self.OUTPUT_DIR / f'{model_id}.json', 'w') as json_file:
+        with open(self.OUTPUT_DIR / f'{self.MODEL_ID}.json', 'w') as json_file:
             json.dump(option_dict, json_file, indent=2)
 
     def load_options(self, model_id):
@@ -81,3 +93,6 @@ class Config:
 
         # Overwrite options
         self.IS_CROP = option_dict['is_crop']
+        self.FLOW_EXTRACTOR = option_dict['flow_extractor']
+
+        self.set_model_option()

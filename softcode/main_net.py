@@ -18,7 +18,7 @@ class Main_net(nn.Module):
     def __init__(self, model_option):
         super().__init__()
 
-        self.tag = 'pwcnet'  # pwcnet, ifnet
+        self.flow_extractor = model_option['flow_extractor']  # pwcnet, ifnet
         self.shape = model_option['shape']  # [height, width]
         self.feature_extractor_1 = context_extractor_layer()
         self.feature_extractor_2 = context_extractor_layer()
@@ -27,11 +27,10 @@ class Main_net(nn.Module):
         self.Matric_UNet = Matric_UNet()
         self.grid_net = GridNet()
 
-        if self.tag == 'pwcnet':
+        if self.flow_extractor == 'pwcnet':
             self.flow_extractor1to2 = PWCNet()
-            self.flow_extractor2to1 = PWCNet()
-        elif self.tag == 'ifnet':
-            self.flow_extractor = IFNet()
+        elif self.flow_extractor == 'ifnet':
+            self.flow_extractor1to2 = IFNet()
 
     def scale_flow_zero(self, flow):
         SCALE = 20.0
@@ -116,11 +115,11 @@ class Main_net(nn.Module):
         flow_1to2_zero = self.scale_flow_zero(flow_1to2)
         flow_2to1_zero = self.scale_flow_zero(flow_2to1)
 
-        if self.tag == 'pwcnet':
+        if self.flow_extractor == 'pwcnet':
             flow_1tot = flow_1to2 * 0.5
             flow_2tot = flow_2to1 * 0.5
 
-        elif self.tag == 'ifnet':
+        elif self.flow_extractor == 'ifnet':
             flow_all = self.flow_extractor(img1, img2)
             channel = flow_all.shape[1] // 2
             flow_1tot = flow_all[:, :channel]
