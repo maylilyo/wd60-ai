@@ -1,4 +1,5 @@
 # Standard
+import time
 
 # PIP
 import torch
@@ -76,4 +77,6 @@ module = CustomModule.load_from_checkpoint(
     lr_scheduler_name=cfg.LR_SCHEDULER,
 )
 
-torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{cfg.PROJECT_TITLE}.pt')
+model_id = int(time.time())
+torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{model_id}.pt')
+cfg.save_options(model_id)

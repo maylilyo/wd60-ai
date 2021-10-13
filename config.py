@@ -1,5 +1,6 @@
 # Standard
 from pathlib import Path
+import json
 
 # PIP
 import pytorch_lightning as pl
@@ -62,3 +63,21 @@ class Config:
         self.model_option = {
             'shape': [height, width],
         }
+
+    def save_options(self, model_id):
+        # Set option dict
+        option_dict = {
+            'is_crop': self.IS_CROP,
+        }
+
+        # Save dict to json
+        with open(self.OUTPUT_DIR / f'{model_id}.json', 'w') as json_file:
+            json.dump(option_dict, json_file, indent=2)
+
+    def load_options(self, model_id):
+        # Load dict from json
+        with open(self.OUTPUT_DIR / f'{model_id}.json', 'r') as json_file:
+            option_dict = json.load(json_file)
+
+        # Overwrite options
+        self.IS_CROP = option_dict['is_crop']

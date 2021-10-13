@@ -1,6 +1,7 @@
 __pycache__/
 .vscode/
 core
-*.pt
 checkout/
 wandb/
+output/
+weights/
