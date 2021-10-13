@@ -33,7 +33,10 @@ class Main_net(nn.Module):
             self.flow_extractor1to2 = IFNet()
 
     def scale_flow_zero(self, flow):
-        SCALE = 20.0
+        if self.flow_extractor == 'ifnet':
+            SCALE = 1.0
+        elif self.flow_extractor == 'pwcnet':
+            SCALE = 20.0
         intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
@@ -47,7 +50,10 @@ class Main_net(nn.Module):
     def scale_flow(self, flow):
         # https://github.com/sniklaus/softmax-splatting/issues/12
 
-        SCALE = 20.0
+        if self.flow_extractor == 'ifnet':
+            SCALE = 1.0
+        elif self.flow_extractor == 'pwcnet':
+            SCALE = 20.0
         intHeight, intWidth = self.shape
 
         raw_scaled = (SCALE / 1) * interpolate(
@@ -62,7 +68,12 @@ class Main_net(nn.Module):
             mode='bilinear',
             align_corners=False,
         )
-        quarter_scaled = (SCALE / 4) * flow
+        quarter_scaled = (SCALE / 4) * interpolate(
+            input=flow,
+            size=(intHeight // 4, intWidth // 4),
+            mode='bilinear',
+            align_corners=False,
+        )
 
         return [raw_scaled, half_scaled, quarter_scaled]
 
@@ -120,7 +131,7 @@ class Main_net(nn.Module):
             flow_2tot = flow_2to1 * 0.5
 
         elif self.flow_extractor == 'ifnet':
-            flow_all = self.flow_extractor(img1, img2)
+            flow_all = self.flow_extractor1to2(img1, img2)
             channel = flow_all.shape[1] // 2
             flow_1tot = flow_all[:, :channel]
             flow_2tot = flow_all[:, channel:]
