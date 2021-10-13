@@ -42,7 +42,6 @@ trainer = Trainer(
     progress_bar_refresh_rate=1 if cfg.IS_PROGRESS_LOG_ON else 0,
     accelerator='dp',
     deterministic=True,
-    # precision=16,
     callbacks=[
         early_stop_callback,
         checkpoint_callback,
@@ -77,4 +76,4 @@ module = CustomModule.load_from_checkpoint(
     lr_scheduler_name=cfg.LR_SCHEDULER,
 )
 
-torch.save(module.model.state_dict(), f'./output/{cfg.PROJECT_TITLE}.pt')
+torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{cfg.PROJECT_TITLE}.pt')

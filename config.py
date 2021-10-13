@@ -16,6 +16,7 @@ class Config:
     DATA_DIR = PROJECT_DIR / 'data'
     VIMEO_DIR = DATA_DIR / 'vimeo_triplet'
     WEIGHT_DIR = PROJECT_DIR / 'weights'
+    OUTPUT_DIR = PROJECT_DIR / 'output'
 
     # Training
     GPUS = [1, 2, 3]
