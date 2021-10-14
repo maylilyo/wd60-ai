@@ -3,18 +3,20 @@
 # PIP
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import OneCycleLR, CosineAnnealingWarmRestarts, StepLR
+from torch.optim.lr_scheduler import OneCycleLR, StepLR
 import pytorch_lightning as pl
 
 # Custom
 from softcode.main_net import Main_net as CustomModel
 import helper.loss as c_loss
+import helper.lr_scheduler as lr_scheduler
 
 
 class CustomModule(pl.LightningModule):
     def __init__(
         self,
         model_option,
+        max_epochs,
         learning_rate=1e-2,
         criterion_name='RMSE',
         optimizer_name='Adam',
@@ -22,6 +24,7 @@ class CustomModule(pl.LightningModule):
         momentum=0.9,
     ):
         super().__init__()
+        self.max_epochs = max_epochs
         self.learning_rate = learning_rate
         self.momentum = momentum
 
@@ -72,15 +75,20 @@ class CustomModule(pl.LightningModule):
             return OneCycleLR(
                 optimizer=self.optimizer,
                 max_lr=self.learning_rate,
-                total_steps=self.max_epoch,
+                total_steps=self.max_epochs * 2297,
                 anneal_strategy='cos',
             )
-        elif name == 'CosineAnnealingWarmRestarts'.lower():
-            return CosineAnnealingWarmRestarts(
+        elif name == 'CosineAnnealingWarmUpRestarts'.lower():
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = 1e-9
+
+            return lr_scheduler.CosineAnnealingWarmUpRestarts(
                 optimizer=self.optimizer,
-                T_0=30,
-                T_mult=1,
-                eta_min=self.learning_rate/10000,
+                T_0=10,
+                T_mult=2,
+                eta_max=self.learning_rate,
+                T_up=5,
+                gamma=0.5,
             )
         elif name == 'StepLR'.lower():
             return StepLR(

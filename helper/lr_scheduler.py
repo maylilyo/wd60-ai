@@ -18,7 +18,6 @@ class CosineAnnealingWarmUpRestarts(_LRScheduler):
             gamma=1.,
             last_epoch=-1,
     ):
-        super().__init__(optimizer, last_epoch)
         if T_0 <= 0 or not isinstance(T_0, int):
             raise ValueError("Expected positive integer T_0, but got {}".format(T_0))
         if T_mult < 1 or not isinstance(T_mult, int):
@@ -34,14 +33,16 @@ class CosineAnnealingWarmUpRestarts(_LRScheduler):
         self.gamma = gamma
         self.cycle = 0
         self.T_cur = last_epoch
+        
+        super().__init__(optimizer, last_epoch)
 
     def get_lr(self):
         if self.T_cur == -1:
             return self.base_lrs
         elif self.T_cur < self.T_up:
-            return [(self.eta_max - base_lr)*self.T_cur / self.T_up + base_lr for base_lr in self.base_lrs]
+            return [(self.eta_max - base_lr) * self.T_cur / self.T_up + base_lr for base_lr in self.base_lrs]
         else:
-            return [base_lr + (self.eta_max - base_lr) * (1 + math.cos(math.pi * (self.T_cur-self.T_up) / (self.T_i - self.T_up))) / 2 for base_lr in self.base_lrs]
+            return [base_lr + (self.eta_max - base_lr) * (1 + math.cos(math.pi * (self.T_cur - self.T_up) / (self.T_i - self.T_up))) / 2 for base_lr in self.base_lrs]
 
     def step(self, epoch=None):
         if epoch is None:

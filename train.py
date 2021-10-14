@@ -3,7 +3,7 @@
 # PIP
 import torch
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 
 # Custom
@@ -35,6 +35,10 @@ checkpoint_callback = ModelCheckpoint(
     mode='min',
 )
 
+lr_monitor = LearningRateMonitor(
+    logging_interval='step',
+)
+
 trainer = Trainer(
     gpus=cfg.GPUS,
     max_epochs=cfg.MAX_EPOCHS,
@@ -45,6 +49,7 @@ trainer = Trainer(
     callbacks=[
         early_stop_callback,
         checkpoint_callback,
+        lr_monitor,
     ],
 )
 
@@ -56,6 +61,7 @@ data_module = CustomDataModule(
 
 module = CustomModule(
     model_option=cfg.model_option,
+    max_epochs=cfg.MAX_EPOCHS,
     learning_rate=cfg.LEARNING_RATE,
     criterion_name=cfg.CRITERION,
     optimizer_name=cfg.OPTIMIZER,
