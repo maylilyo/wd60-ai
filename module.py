@@ -75,13 +75,10 @@ class CustomModule(pl.LightningModule):
             return OneCycleLR(
                 optimizer=self.optimizer,
                 max_lr=self.learning_rate,
-                total_steps=self.max_epochs * 2297,
+                total_steps=self.max_epochs,
                 anneal_strategy='cos',
             )
         elif name == 'CosineAnnealingWarmUpRestarts'.lower():
-            for param_group in self.optimizer.param_groups:
-                param_group['lr'] = 1e-9
-
             return lr_scheduler.CosineAnnealingWarmUpRestarts(
                 optimizer=self.optimizer,
                 T_0=10,
@@ -93,7 +90,7 @@ class CustomModule(pl.LightningModule):
         elif name == 'StepLR'.lower():
             return StepLR(
                 optimizer=self.optimizer,
-                step_size=20,
+                step_size=5,
                 gamma=0.5,
             )
 
@@ -127,6 +124,8 @@ class CustomModule(pl.LightningModule):
         loss /= len(y)
 
         metric = self.metric_function(y_hat, y)
+        lr = self.lr_scheduler.get_last_lr()[0]
+        self.log('lr', lr)
 
         return loss, metric
 
@@ -142,8 +141,8 @@ class CustomModule(pl.LightningModule):
 
         loss, metric = self.common_step(batch, state='valid')
 
-        self.log('valid_loss', loss, sync_dist=True)
-        self.log('valid_ssim', metric, sync_dist=True)
+        self.log('val_loss', loss, sync_dist=True)
+        self.log('val_ssim', metric, sync_dist=True)
 
     def test_step(self, batch, batch_idx):
 

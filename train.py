@@ -20,7 +20,7 @@ wandb_logger = WandbLogger(
 )
 
 early_stop_callback = EarlyStopping(
-    monitor='valid_loss',
+    monitor='val_loss',
     min_delta=0.00,
     patience=cfg.EARLYSTOP_PATIENCE,
     verbose=False,
@@ -28,9 +28,9 @@ early_stop_callback = EarlyStopping(
 )
 
 checkpoint_callback = ModelCheckpoint(
-    monitor='valid_loss',
+    monitor='val_loss',
     dirpath='./checkout/',
-    filename=cfg.PROJECT_TITLE + '-{epoch:04d}-{valid_loss:.5f}',
+    filename=cfg.PROJECT_TITLE + '-{epoch:04d}-{val_loss:.5f}',
     save_top_k=1,
     mode='min',
 )
@@ -76,6 +76,7 @@ print(f'Best model : {checkpoint_callback.best_model_path}')
 module = CustomModule.load_from_checkpoint(
     checkpoint_callback.best_model_path,
     model_option=cfg.model_option,
+    max_epochs=cfg.MAX_EPOCHS,
     learning_rate=cfg.LEARNING_RATE,
     criterion_name=cfg.CRITERION,
     optimizer_name=cfg.OPTIMIZER,
@@ -85,7 +86,7 @@ module = CustomModule.load_from_checkpoint(
 torch.save(module.model.state_dict(), cfg.OUTPUT_DIR / f'{cfg.MODEL_ID}.pt')
 
 additional_log = {
-    'valid_loss': float(trainer.callback_metrics['valid_loss']),
-    'valid_ssim': float(trainer.callback_metrics['valid_ssim']),
+    'val_loss': float(trainer.callback_metrics['val_loss']),
+    'val_ssim': float(trainer.callback_metrics['val_ssim']),
 }
 cfg.save_options(additional_log)
