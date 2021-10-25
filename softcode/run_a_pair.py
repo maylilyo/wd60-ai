@@ -1,9 +1,17 @@
 import numpy as np
 import torch
 import cv2
+from torchvision.utils import save_image
 
 from main_net import Main_net
-from test import save_test_image
+
+
+def save_test_image(image, file_name='test.jpg'):
+
+    # BGR → RGB
+    image = torch.flip(image, [0])
+
+    save_image(image, f'result/{file_name}')
 
 
 def read_sample_images():
