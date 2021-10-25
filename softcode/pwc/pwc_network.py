@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import getopt
+from pathlib import Path
 
 import numpy
 import torch
@@ -10,6 +11,10 @@ import torch.nn.functional as F
 
 from .utils.constv import ConstV
 from .correlation import correlation
+
+PROJECT_DIR = Path(__file__).absolute().parent.parent.parent
+WEIGHT_DIR = PROJECT_DIR / 'weights'
+
 
 # torch.set_grad_enabled(False) # make sure to not compute gradients for computational performance
 
@@ -93,7 +98,8 @@ class Extractor(nn.Module):
 
 
 class Decoder(nn.Module):
-    tmp_list = [None, None, 81 + 32 + 2 + 2, 81 + 64 + 2 + 2, 81 + 96 + 2 + 2, 81 + 128 + 2 + 2, 81, None]
+    tmp_list = [None, None, 81 + 32 + 2 + 2, 81 + 64 +
+                2 + 2, 81 + 96 + 2 + 2, 81 + 128 + 2 + 2, 81, None]
 
     grid_cache = {}
     partial_cache = {}
@@ -121,7 +127,8 @@ class Decoder(nn.Module):
                 padding=1,
             )
         if intLevel < 6:
-            self.fltBackwarp = [None, None, None, 5.0, 2.5, 1.25, 0.625, None][intLevel + 1]
+            self.fltBackwarp = [None, None, None, 5.0,
+                                2.5, 1.25, 0.625, None][intLevel + 1]
 
         self.netOne = self.get_new_CNN(intCurrent, 128)
         self.netTwo = self.get_new_CNN(intCurrent + 128, 128)
@@ -165,7 +172,8 @@ class Decoder(nn.Module):
                 steps=flow_tensor.shape[3],
             )
             horizontal_tensor = horizontal_tensor.view(1, 1, 1, -1)
-            horizontal_tensor = horizontal_tensor.expand(-1, -1, flow_tensor.shape[2], -1)
+            horizontal_tensor = horizontal_tensor.expand(
+                -1, -1, flow_tensor.shape[2], -1)
 
             vertical_tensor = torch.linspace(
                 start=-1.0 + (1.0 / flow_tensor.shape[2]),
@@ -173,7 +181,8 @@ class Decoder(nn.Module):
                 steps=flow_tensor.shape[2],
             )
             vertical_tensor = vertical_tensor.view(1, 1, -1, 1)
-            vertical_tensor = vertical_tensor.expand(-1, -1, -1, flow_tensor.shape[3])
+            vertical_tensor = vertical_tensor.expand(
+                -1, -1, -1, flow_tensor.shape[3])
 
             backwarped_tensor = torch.cat(
                 tensors=[horizontal_tensor, vertical_tensor],
@@ -194,13 +203,16 @@ class Decoder(nn.Module):
         #     # Save partial to cache
         #     Decoder.partial_cache[key] = partial_tensor
 
-        partial_tensor = flow_tensor.new_ones([flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
+        partial_tensor = flow_tensor.new_ones(
+            [flow_tensor.shape[0], 1, flow_tensor.shape[2], flow_tensor.shape[3]])
         partial_tensor = partial_tensor.type_as(flow_tensor)
 
         flow_tensor = torch.cat(
             tensors=[
-                flow_tensor[:, 0:1, :, :] / ((input_tensor.shape[3] - 1.0) / 2.0),
-                flow_tensor[:, 1:2, :, :] / ((input_tensor.shape[2] - 1.0) / 2.0)
+                flow_tensor[:, 0:1, :, :] /
+                ((input_tensor.shape[3] - 1.0) / 2.0),
+                flow_tensor[:, 1:2, :, :] /
+                ((input_tensor.shape[2] - 1.0) / 2.0)
             ],
             dim=1,
         )
@@ -269,11 +281,16 @@ class Decoder(nn.Module):
                 dim=1,
             )
 
-        feature_tensor = torch.cat([self.netOne(feature_tensor), feature_tensor], 1)
-        feature_tensor = torch.cat([self.netTwo(feature_tensor), feature_tensor], 1)
-        feature_tensor = torch.cat([self.netThr(feature_tensor), feature_tensor], 1)
-        feature_tensor = torch.cat([self.netFou(feature_tensor), feature_tensor], 1)
-        feature_tensor = torch.cat([self.netFiv(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat(
+            [self.netOne(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat(
+            [self.netTwo(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat(
+            [self.netThr(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat(
+            [self.netFou(feature_tensor), feature_tensor], 1)
+        feature_tensor = torch.cat(
+            [self.netFiv(feature_tensor), feature_tensor], 1)
 
         flow_tensor = self.netSix(feature_tensor)
 
@@ -410,36 +427,43 @@ class Network(nn.Module):  # flownet
         # 不清楚为啥 不能load 似乎只会起反作用，应该是估计的光流没有起到很好的效果？？？
         # 看来输入的光流必须除以255否则不顶用 这根预训练模型绝对有关系
 
-        self.load_state_dict(torch.load('weights/pwc.pt'))
+        state_dict = torch.load(WEIGHT_DIR / 'pwc.pt')
+        self.load_state_dict(state_dict)
 
     def forward(self, first_tensor, second_tensor):
         first_tensor = self.netExtractor(first_tensor)
         second_tensor = self.netExtractor(second_tensor)
         if ConstV.mutil_l:
-            objEstimate = self.netSix(first_tensor[-1], second_tensor[-1], None)
+            objEstimate = self.netSix(
+                first_tensor[-1], second_tensor[-1], None)
             # objEstimate['tneFlow'] = [2,2,6,7]
 
             flow_l1 = objEstimate['flow_tensor']
 
-            objEstimate = self.netFiv(first_tensor[-2], second_tensor[-2], objEstimate)
+            objEstimate = self.netFiv(
+                first_tensor[-2], second_tensor[-2], objEstimate)
             # objEstimate['tneFlow'] = [2,2,12,14] [2,529,6,7]
 
             flow_l2 = objEstimate['flow_tensor']
             # flow_l2 = objEstimate['flow_tensor'] + self.context_refiners[1](objEstimate['feature_tensor'])
-            objEstimate = self.netFou(first_tensor[-3], second_tensor[-3], objEstimate)
+            objEstimate = self.netFou(
+                first_tensor[-3], second_tensor[-3], objEstimate)
 
             # objEstimate['tneFlow'] = [2,2,24,28] [2, 661, 12, 14]
             flow_l3 = objEstimate['flow_tensor']
             # flow_l3 = objEstimate['flow_tensor'] + self.context_refiners[2](objEstimate['feature_tensor'])
-            objEstimate = self.netThr(first_tensor[-4], second_tensor[-4], objEstimate)
+            objEstimate = self.netThr(
+                first_tensor[-4], second_tensor[-4], objEstimate)
 
             # objEstimate['tneFlow'] = [2,2,48,56]
             flow_l4 = objEstimate['flow_tensor']
             # flow_l4 = objEstimate['flow_tensor'] + self.context_refiners[3](objEstimate['feature_tensor'])
-            objEstimate = self.netTwo(first_tensor[-5], second_tensor[-5], objEstimate)
+            objEstimate = self.netTwo(
+                first_tensor[-5], second_tensor[-5], objEstimate)
         # shapels.append(objEstimate['feature_tensor'].shape[1])
         # print(shapels)
-            flow_l5 = objEstimate['flow_tensor'] + self.refiner(objEstimate['feature_tensor'])
+            flow_l5 = objEstimate['flow_tensor'] + \
+                self.refiner(objEstimate['feature_tensor'])
         # objEstimate['tneFlow'] = [2,2,96,112]
         # 貌似是把最后一层的尺寸强行拉到 原始输入尺寸 即扩大四倍 然后数值也乘4
         # if l == args.output_level:
@@ -458,19 +482,24 @@ class Network(nn.Module):  # flownet
                 return flow_l5
         else:
             # shapels = []
-            objEstimate = self.netSix(first_tensor[-1], second_tensor[-1], None)
+            objEstimate = self.netSix(
+                first_tensor[-1], second_tensor[-1], None)
             # objEstimate['tneFlow'] = [2,2,6,7]
 
-            objEstimate = self.netFiv(first_tensor[-2], second_tensor[-2], objEstimate)
+            objEstimate = self.netFiv(
+                first_tensor[-2], second_tensor[-2], objEstimate)
             # objEstimate['tneFlow'] = [2,2,12,14] [2,529,6,7]
 
-            objEstimate = self.netFou(first_tensor[-3], second_tensor[-3], objEstimate)
+            objEstimate = self.netFou(
+                first_tensor[-3], second_tensor[-3], objEstimate)
             # shapels.append(objEstimate['feature_tensor'].shape[1])
 
-            objEstimate = self.netThr(first_tensor[-4], second_tensor[-4], objEstimate)
+            objEstimate = self.netThr(
+                first_tensor[-4], second_tensor[-4], objEstimate)
 
             # flow_l4 = objEstimate['flow_tensor'] + self.context_refiners[3](objEstimate['feature_tensor'])
-            objEstimate = self.netTwo(first_tensor[-5], second_tensor[-5], objEstimate)
+            objEstimate = self.netTwo(
+                first_tensor[-5], second_tensor[-5], objEstimate)
 
             # flow_coarse + flow_fine
             return objEstimate['flow_tensor'] + self.refiner(objEstimate['feature_tensor'])
