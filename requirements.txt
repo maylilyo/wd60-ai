@@ -2,3 +2,4 @@ pytorch-lightning
 imageio
 icecream
 wandb
+cupy-cuda111
