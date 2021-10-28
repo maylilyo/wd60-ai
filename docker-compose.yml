@@ -1,9 +1,8 @@
 version: "3.9"
 services:
   dev:
-    image: sehandev/softsplat
-    ports:
-      - "8888:8888"
+    image: sehandev/lambda-stack:20.04
+    working_dir: /workspace
     volumes:
       - .:/workspace
       - /home/wd60/data:/workspace/data
