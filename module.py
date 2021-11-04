@@ -54,7 +54,8 @@ class CustomModule(pl.LightningModule):
         elif name == 'SSIM'.lower():
             return c_loss.SSIM()
 
-        raise ValueError(f'{loss_function_name} is not on the custom criterion list!')
+        raise ValueError(
+            f'{loss_function_name} is not on the custom criterion list!')
 
     def get_optimizer(self, optimizer_name):
         name = optimizer_name.lower()
@@ -66,7 +67,8 @@ class CustomModule(pl.LightningModule):
         elif name == 'AdamW'.lower():
             return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
 
-        raise ValueError(f'{optimizer_name} is not on the custom optimizer list!')
+        raise ValueError(
+            f'{optimizer_name} is not on the custom optimizer list!')
 
     def get_lr_scheduler(self, scheduler_name):
         name = scheduler_name.lower()
@@ -94,7 +96,8 @@ class CustomModule(pl.LightningModule):
                 gamma=0.5,
             )
 
-        raise ValueError(f'{scheduler_name} is not on the custom scheduler list!')
+        raise ValueError(
+            f'{scheduler_name} is not on the custom scheduler list!')
 
     def forward(self, img1, img2):
         # img1: (batch_size, ???)
