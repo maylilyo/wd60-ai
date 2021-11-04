@@ -80,7 +80,8 @@ def train():
 
                 pbar.set_postfix({'train_loss': loss.item()})
                 total_loss += loss
-        print(f'Epoch: {epoch:02d} loss: {total_loss.item() / len(train_loader)}')
+        print(
+            f'Epoch: {epoch:02d} loss: {total_loss.item() / len(train_loader)}')
         if (epoch+1) % 3 == 0:
             torch.save(model, WEIGHT_DIR / f'epoch_{epoch:02d}.pt')
 
