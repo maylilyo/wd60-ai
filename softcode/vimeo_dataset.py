@@ -49,6 +49,8 @@ class Vimeo(Dataset):
         total_res_ls = []
         with open(self.base_dir / f'tri_{state}list.txt', 'r') as f:
             each_ls = f.readlines()
+            if '' in each_ls:
+                each_ls.remove('')
             for each in each_ls:
                 each = each.strip('\n')
                 tmp_p_ls = []
