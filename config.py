@@ -12,7 +12,7 @@ import pytorch_lightning as pl
 
 class Config:
     # User Setting
-    SEED = 3
+    SEED = 100
 
     # Path
     PROJECT_DIR = Path(__file__).absolute().parent
@@ -22,11 +22,11 @@ class Config:
     OUTPUT_DIR = PROJECT_DIR / 'output'
 
     # Training
-    GPUS = [1, 2, 3]
-    MAX_EPOCHS = 100
+    GPUS = [0, 1, 2, 3]
+    MAX_EPOCHS = 10
     EARLYSTOP_PATIENCE = 100
-    BATCH_SIZE = 8
-    LEARNING_RATE = 1e-4
+    BATCH_SIZE = 2
+    LEARNING_RATE = 1e-6
     CRITERION = 'LapLoss'
     OPTIMIZER = 'AdamW'
     LR_SCHEDULER = 'StepLR'
@@ -34,9 +34,10 @@ class Config:
     # Model
     IS_CROP = False
     FLOW_EXTRACTOR = 'ifnet'  # pwcnet, ifnet
+    IS_FREEZE = False
 
     # Dataset
-    NUM_WORKERS = 16
+    NUM_WORKERS = 8
 
     # Log
     MODEL_ID = str(int(time.time()))
@@ -67,6 +68,7 @@ class Config:
         self.model_option = {
             'shape': [height, width],
             'flow_extractor': self.FLOW_EXTRACTOR,
+            'is_freeze': self.IS_FREEZE,
         }
 
     def save_options(self, additional_log):
@@ -74,6 +76,7 @@ class Config:
         option_dict = {
             'is_crop': self.IS_CROP,
             'flow_extractor': self.FLOW_EXTRACTOR,
+            'is_freeze': self.IS_FREEZE,
             'train_option': {
                 'max_epochs': self.MAX_EPOCHS,
                 'seed': self.SEED,
@@ -96,5 +99,6 @@ class Config:
         # Overwrite options
         self.IS_CROP = option_dict['is_crop']
         self.FLOW_EXTRACTOR = option_dict['flow_extractor']
+        self.IS_FREEZE = option_dict['is_freeze']
 
         self.set_model_option()
