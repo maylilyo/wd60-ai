@@ -3,3 +3,4 @@ imageio
 icecream
 wandb
 cupy-cuda111
+ptflops
