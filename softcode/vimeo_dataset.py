@@ -67,13 +67,17 @@ class Vimeo(Dataset):
         img2_path = self.files_dir_ls[idx][-1]
         target_path = self.files_dir_ls[idx][1]
 
-        img1, img2, target = map(imageio.imread, (img1_path, img2_path, target_path))
+        img1, img2, target = map(
+            imageio.imread, (img1_path, img2_path, target_path))
         H, W = img1.shape[:2]
 
         # pad to 64
-        img1 = np.pad(img1, ((0, (64 - H % 64) if H % 64 else 0), (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
-        img2 = np.pad(img2, ((0, (64 - H % 64) if H % 64 else 0), (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
-        target = np.pad(target, ((0, (64 - H % 64) if H % 64 else 0), (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
+        img1 = np.pad(img1, ((0, (64 - H % 64) if H % 64 else 0),
+                      (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
+        img2 = np.pad(img2, ((0, (64 - H % 64) if H % 64 else 0),
+                      (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
+        target = np.pad(target, ((0, (64 - H % 64) if H % 64 else 0),
+                        (0, (64 - W % 64) if H % 64 else 0), (0, 0)), mode='constant')
         images = [img1, img2, target]
         if self.augument:
             if self.cropper == 'random':
@@ -81,6 +85,6 @@ class Vimeo(Dataset):
             else:
                 cropper = StaticCenterCrop(img1.shape[:2], self.crop_shape)
             images = list(map(cropper, images))
-        images = [torch.from_numpy(each.transpose(2, 0, 1).astype(np.float32)) * (1.0 / 255.0) for each in images]
-
+        images = [torch.from_numpy(each.transpose(2, 0, 1).astype(
+            np.float32)) * (1.0 / 255.0) for each in images]
         return images
