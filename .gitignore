@@ -5,3 +5,4 @@ checkout/
 wandb/
 output/
 weights/
+data/
