@@ -32,6 +32,29 @@ class Main_net(nn.Module):
         elif self.flow_net_name == 'ifnet':
             self.flow_extractor = IFNet()
 
+        # Load from weight file
+        state_dict = torch.load('/workspace/weights/softsplat.pt')
+        for key in list(state_dict.keys()):
+            if 'flow_extractor1to2' in key:
+                if self.flow_net_name == 'pwcnet':
+                    state_dict[key.replace('flow_extractor1to2', 'flow_extractor')] = state_dict.pop(key)
+                elif self.flow_net_name == 'ifnet':
+                    state_dict.pop(key)
+            if 'flow_extractor2to1' in key:
+                state_dict.pop(key)
+        self.load_state_dict(state_dict, strict=False)
+
+        if model_option['is_freeze']:
+            self.freeze_layers(self)
+
+    def freeze_layers(self, model):
+        for name, child in model.named_children():
+            if name == 'flow_extractor':
+                continue
+            for param in child.parameters():
+                param.requires_grad = False
+            self.freeze_layers(child)
+
     def scale_flow_zero(self, flow):
         if self.flow_net_name == 'pwcnet':
             SCALE = 20.0
